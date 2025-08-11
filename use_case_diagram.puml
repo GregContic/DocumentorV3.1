@@ -1,0 +1,39 @@
+@startuml
+
+left to right direction
+
+actor Student
+actor Admin
+actor Registrar
+actor Teacher
+
+rectangle "Document Request & Enrollment System" {
+  Student -- (Register Account)
+  Student -- (Login)
+  Student -- (Submit Enrollment Application)
+  Student -- (Upload Documents)
+  Student -- (Track Enrollment Status)
+  Student -- (Request Documents)
+  Student -- (Track Request Status)
+  Student -- (Chat with AI Assistant)
+
+  Admin -- (Login)
+  Admin -- (View Enrollment Applications)
+  Admin -- (Approve/Reject Enrollment)
+  Admin -- (View Document Requests)
+  Admin -- (Approve/Reject Requests)
+  Admin -- (Manage Users)
+  Admin -- (Archive Records)
+
+  Registrar -- (Login)
+  Registrar -- (View Enrollment Applications)
+  Registrar -- (Process Enrollment)
+  Registrar -- (View Document Requests)
+  Registrar -- (Process Document Requests)
+
+  Teacher -- (Login)
+  Teacher -- (View Student List)
+  Teacher -- (View Enrollment Status)
+}
+
+@enduml
