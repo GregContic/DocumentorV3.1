@@ -58,14 +58,30 @@ export const authService = {
 
 // Document request services
 export const documentService = {
-  createRequest: (requestData) => api.post('/api/documents/request', requestData),
+  createRequest: (requestData) => {
+    // Handle FormData for file uploads
+    const config = requestData instanceof FormData ? {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    } : {};
+    return api.post('/api/documents/request', requestData, config);
+  },
   getMyRequests: () => api.get('/api/documents/my-requests'),
   getRequestById: (id) => api.get(`/api/documents/request/${id}`),
+  
   // Admin specific endpoints
   getAllRequests: () => api.get('/api/documents/admin/documents/requests'),
-  updateRequestStatus: (requestId, status, additionalData = {}) => 
-    api.patch(`/api/documents/admin/documents/request/${requestId}/status`, { status, ...additionalData }),
+  getFilteredRequests: (params) => api.get('/api/documents/admin/documents/filtered-requests', { params }),
+  getDashboardAnalytics: (period = '30') => api.get(`/api/documents/admin/documents/analytics?period=${period}`),
+  updateRequestStatus: (requestId, statusData) => 
+    api.patch(`/api/documents/admin/documents/request/${requestId}/status`, statusData),
+  bulkUpdateRequests: (updateData) => 
+    api.patch('/api/documents/admin/documents/bulk-update', updateData),
+  updateProcessingStep: (requestId, stepData) =>
+    api.patch(`/api/documents/admin/documents/request/${requestId}/processing-step`, stepData),
   getRequestStats: () => api.get('/api/documents/admin/documents/stats'),
+  
   // Archive endpoints
   getArchivedDocuments: () => api.get('/api/documents/admin/documents/archived-requests'),
   archiveRequest: (requestId) => 

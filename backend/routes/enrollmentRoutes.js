@@ -4,6 +4,9 @@ const enrollmentController = require('../controllers/enrollmentController');
 const { authenticate, authorizeAdmin, preventAdminSubmission } = require('../middleware/authMiddleware');
 const { uploadEnrollmentDocs } = require('../middleware/uploadMiddleware');
 
+// Admin: Get enrollments by section name
+router.get('/', authenticate, authorizeAdmin, enrollmentController.getEnrollmentsBySection);
+
 // Student: Submit enrollment with file uploads (requires authentication)
 router.post('/', authenticate, uploadEnrollmentDocs, enrollmentController.createEnrollment);
 

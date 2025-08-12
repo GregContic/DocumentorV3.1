@@ -1,3 +1,18 @@
+// Get enrollments by section name (admin)
+exports.getEnrollmentsBySection = async (req, res) => {
+  try {
+    const sectionName = req.query.section;
+    if (!sectionName) {
+      return res.status(400).json({ message: 'Section name is required' });
+    }
+    const enrollments = await Enrollment.find({ section: sectionName })
+      .populate('user', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+    res.json(enrollments);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch enrollments for section', error: error.message });
+  }
+};
 // Delete enrollment by ID (admin only)
 exports.deleteEnrollment = async (req, res) => {
   try {

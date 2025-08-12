@@ -10,6 +10,7 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const chatbotRoutes = require('./routes/chatbotRoutes');
 const enrollmentRoutes = require('./routes/enrollmentRoutes');
 const form137StubRoutes = require('./routes/form137StubRoutes');
+const sectionRoutes = require('./routes/sectionRoutes');
 
 // Load environment variables
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/chatbot', chatbotRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/form137-stubs', form137StubRoutes);
+app.use('/api/sections', sectionRoutes);
 
 // Basic route for testing
 app.get('/', (req, res) => {

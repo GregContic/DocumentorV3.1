@@ -12,8 +12,8 @@ exports.register = async (req, res) => {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    // Only allow 'user' role during registration
-    if (role && role !== 'user') {
+    // Only allow 'user' role during registration, admin roles must be created separately
+    if (role && !['user'].includes(role)) {
       return res.status(400).json({ message: 'Invalid role specified' });
     }
 

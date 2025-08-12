@@ -106,6 +106,13 @@ export const AuthProvider = ({ children }) => {
     validateSession,
     isAuthenticated: !!user,
     isAdmin: user?.role === 'admin',
+    isSuperAdmin: user?.role === 'super-admin',
+    isDocumentAdmin: user?.role === 'admin-document',
+    isEnrollmentAdmin: user?.role === 'admin-enrollment',
+    isAnyAdmin: user?.role && ['admin', 'super-admin', 'admin-document', 'admin-enrollment'].includes(user.role),
+    // Helper function to check specific permissions
+    hasRole: (role) => user?.role === role,
+    hasAnyRole: (roles) => roles.includes(user?.role),
   };
 
   return (

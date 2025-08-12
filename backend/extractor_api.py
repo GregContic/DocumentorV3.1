@@ -1,36 +1,39 @@
 
-# Imports
-import os
-import io
-import re
-import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
-import pdfplumber
-import pytesseract
-from PIL import Image, ImageFilter, ImageOps, ImageEnhance
+import io
 import logging
+import traceback
+import os
+import re
 
-# Setup logging
+# Import the enhanced OCR processor
+try:
+    from ocr_processor import DocumentOCRProcessor, extract_birth_certificate_data, apply_ocr_corrections
+    OCR_PROCESSOR_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Enhanced OCR processor not available: {e}")
+    OCR_PROCESSOR_AVAILABLE = False
+
+app = Flask(__name__)
+CORS(app)
+
+# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Tesseract path
-pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
-
-# Try to import OpenCV for advanced image processing
-try:
-    import cv2
-    CV2_AVAILABLE = True
-    logger.info("OpenCV available for advanced image processing")
-except ImportError:
-    CV2_AVAILABLE = False
-    logger.warning("OpenCV not available, using PIL-only preprocessing")
-
-# Flask app and CORS
-app = Flask(__name__)
-CORS(app)
+# Initialize the enhanced OCR processor
+if OCR_PROCESSOR_AVAILABLE:
+    try:
+        ocr_processor = DocumentOCRProcessor()
+        logger.info("Enhanced DocumentOCRProcessor initialized successfully")
+    except Exception as e:
+        logger.error(f"Failed to initialize OCR processor: {e}")
+        ocr_processor = None
+        OCR_PROCESSOR_AVAILABLE = False
+else:
+    ocr_processor = None
 
 # Ensure CORS headers are set on all responses, including errors
 @app.after_request
@@ -40,7 +43,6 @@ def add_cors_headers(response):
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     return response
 
-# Ensure CORS headers are set on all error responses, including exceptions
 @app.errorhandler(HTTPException)
 def handle_http_exception(e):
     response = e.get_response()
@@ -48,6 +50,134 @@ def handle_http_exception(e):
     response.headers['Access-Control-Allow-Headers'] = 'Content-Type,Authorization'
     response.headers['Access-Control-Allow-Methods'] = 'GET,POST,OPTIONS'
     return response
+
+@app.route('/extract', methods=['POST'])
+def extract_text_from_image_bytes():
+    """
+    Enhanced OCR extraction endpoint with document-specific processing.
+    Supports Philippine NSO birth certificates with advanced preprocessing.
+    """
+    try:
+        if not OCR_PROCESSOR_AVAILABLE or not ocr_processor:
+            return jsonify({
+                'success': False,
+                'error': 'Enhanced OCR processor not available',
+                'text': '',
+                'structured_data': {}
+            }), 500
+        
+        # Get image bytes from request
+        if 'image' not in request.files:
+            return jsonify({
+                'success': False,
+                'error': 'No image file provided',
+                'text': '',
+                'structured_data': {}
+            }), 400
+        
+        image_file = request.files['image']
+        image_bytes = image_file.read()
+        
+        if not image_bytes:
+            return jsonify({
+                'success': False,
+                'error': 'Empty image file',
+                'text': '',
+                'structured_data': {}
+            }), 400
+        
+        # Get document type from request (defaults to auto-detection)
+        document_type = request.form.get('document_type', 'auto')
+        
+        logger.info(f"Processing image with document type: {document_type}")
+        
+        # Extract text using enhanced OCR processor
+        extracted_text = ocr_processor.extract_text_from_image(image_bytes, document_type)
+        
+        if not extracted_text or len(extracted_text.strip()) < 10:
+            return jsonify({
+                'success': False,
+                'error': 'Could not extract meaningful text from image',
+                'text': extracted_text,
+                'structured_data': {}
+            }), 400
+        
+        logger.info(f"Successfully extracted {len(extracted_text)} characters of text")
+        
+        # Extract structured data based on document type
+        structured_data = {}
+        if document_type == 'birth_certificate' or 'birth' in extracted_text.lower():
+            try:
+                structured_data = extract_birth_certificate_data(extracted_text)
+                logger.info(f"Extracted birth certificate data: {list(structured_data.keys())}")
+            except Exception as e:
+                logger.warning(f"Failed to extract structured birth certificate data: {e}")
+        
+        # Apply final corrections
+        corrected_text = apply_ocr_corrections(extracted_text, document_type)
+        
+        return jsonify({
+            'success': True,
+            'text': corrected_text,
+            'raw_text': extracted_text,
+            'structured_data': structured_data,
+            'document_type': document_type,
+            'confidence': 'high' if len(structured_data) > 3 else 'medium'
+        })
+        
+    except Exception as e:
+        logger.error(f"OCR extraction failed: {e}")
+        logger.error(traceback.format_exc())
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'text': '',
+            'structured_data': {}
+        }), 500
+
+@app.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint."""
+    return jsonify({
+        'status': 'healthy',
+        'processor_available': OCR_PROCESSOR_AVAILABLE and ocr_processor is not None,
+        'version': '2.0.0-enhanced'
+    })
+
+@app.route('/test', methods=['GET'])
+def test_extraction():
+    """Test endpoint for verifying NSO birth certificate improvements."""
+    try:
+        if not OCR_PROCESSOR_AVAILABLE:
+            return jsonify({
+                'test_successful': False,
+                'error': 'Enhanced OCR processor not available'
+            }), 500
+            
+        # Test the enhanced corrections
+        test_text = """
+        RepublioofthePhiippines
+        NAME TOD FIRST NAME Oo0 Totstnunber Tb Neetohidrenaa GNeotchiidewn
+        November25204
+        Benguet Generalal Hospital La Trinidadd Benguet
+        sexnorluscm Ueew
+        """
+        
+        corrected = apply_ocr_corrections(test_text, 'birth_certificate')
+        structured = extract_birth_certificate_data(corrected)
+        
+        return jsonify({
+            'test_successful': True,
+            'original_text': test_text,
+            'corrected_text': corrected,
+            'extracted_data': structured
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'test_successful': False,
+            'error': str(e)
+        }), 500
 
 # Helper function to extract text from PDF using pdfplumber
 

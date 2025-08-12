@@ -1,23 +1,104 @@
 const DocumentRequest = require('../models/DocumentRequest');
 const User = require('../models/User');
+const notificationService = require('../utils/notificationService');
+const path = require('path');
+const fs = require('fs');
 
-// User: Create a new document request
+// Helper function to extract text using OCR API
+const extractDocumentData = async (file) => {
+  try {
+    const FormData = require('form-data');
+    const axios = require('axios');
+    
+    const formData = new FormData();
+    formData.append('document', fs.createReadStream(file.path), {
+      filename: file.originalname,
+      contentType: file.mimetype
+    });
+    
+    const response = await axios.post('http://localhost:5001/api/extract-pdf', formData, {
+      headers: {
+        ...formData.getHeaders()
+      },
+      timeout: 30000
+    });
+    
+    return response.data;
+  } catch (error) {
+    console.error('OCR extraction failed:', error.message);
+    return null;
+  }
+};
+
+// User: Create a new document request with OCR processing
 exports.createRequest = async (req, res) => {
   try {
     const userId = req.user.userId;
     const requestData = {
       user: userId,
-      ...req.body // This will include all the form fields from the frontend
+      status: 'submitted',
+      ...req.body
     };
+    
+    // If files were uploaded, process them
+    if (req.files && req.files.length > 0) {
+      requestData.uploadedFiles = req.files.map(file => ({
+        filename: file.filename,
+        originalName: file.originalname,
+        path: file.path,
+        mimetype: file.mimetype,
+        size: file.size
+      }));
+      
+      // Extract data from the first document
+      try {
+        const extractedData = await extractDocumentData(req.files[0]);
+        if (extractedData && extractedData.success) {
+          requestData.extractedData = extractedData.data;
+          
+          // Auto-fill fields from extracted data if not provided
+          if (extractedData.data.form137Data) {
+            const extracted = extractedData.data.form137Data;
+            if (!requestData.surname && extracted.surname) requestData.surname = extracted.surname;
+            if (!requestData.givenName && extracted.givenName) requestData.givenName = extracted.givenName;
+            if (!requestData.dateOfBirth && extracted.dateOfBirth) requestData.dateOfBirth = extracted.dateOfBirth;
+            if (!requestData.studentNumber && extracted.studentNumber) requestData.studentNumber = extracted.studentNumber;
+          }
+        }
+      } catch (extractError) {
+        console.error('Error during OCR extraction:', extractError);
+        // Continue without extraction data
+      }
+    }
     
     const request = new DocumentRequest(requestData);
     await request.save();
+    
+    // Update first processing step
+    if (request.processingSteps.length > 0) {
+      request.processingSteps[0].status = 'completed';
+      request.processingSteps[0].completedAt = new Date();
+      await request.save();
+    }
+    
+    // Populate user data for notifications
+    await request.populate('user');
+    
+    // Send notification to admins about new request
+    try {
+      await notificationService.notifyAdminNewRequest(request, request.user);
+    } catch (notificationError) {
+      console.error('Error sending admin notification:', notificationError);
+    }
+    
     res.status(201).json({ 
       message: 'Request submitted successfully', 
       request: {
         id: request._id,
         documentType: request.documentType,
         status: request.status,
+        estimatedCompletionDate: request.estimatedCompletionDate,
+        extractedData: request.extractedData,
         createdAt: request.createdAt
       }
     });
@@ -107,6 +188,14 @@ exports.updateRequestStatus = async (req, res) => {
     const { requestId } = req.params;
     const { status, rejectionReason, reviewNotes } = req.body;
     
+    // Get the current request to track status changes
+    const currentRequest = await DocumentRequest.findById(requestId).populate('user');
+    if (!currentRequest) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    
+    const oldStatus = currentRequest.status;
+    
     const updateData = { 
       status,
       reviewedBy: req.user.userId,
@@ -135,9 +224,16 @@ exports.updateRequestStatus = async (req, res) => {
       requestId,
       updateData,
       { new: true }
-    );
+    ).populate('user');
     
-    if (!request) return res.status(404).json({ message: 'Request not found' });
+    // Send notification to user about status change
+    if (oldStatus !== status) {
+      try {
+        await notificationService.notifyStatusChange(request.user, request, oldStatus, status);
+      } catch (notificationError) {
+        console.error('Error sending status change notification:', notificationError);
+      }
+    }
     
     res.json({
       success: true,
@@ -242,6 +338,222 @@ exports.restoreArchivedRequest = async (req, res) => {
       message: 'Error restoring request',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
+  }
+};
+
+// Admin: Bulk update request statuses
+exports.bulkUpdateRequests = async (req, res) => {
+  try {
+    const { requestIds, status, rejectionReason, reviewNotes } = req.body;
+    
+    if (!requestIds || !Array.isArray(requestIds) || requestIds.length === 0) {
+      return res.status(400).json({ message: 'Request IDs are required' });
+    }
+    
+    const updateData = { 
+      status,
+      reviewedBy: req.user.userId,
+      reviewedAt: new Date()
+    };
+    
+    if (status === 'completed') {
+      updateData.completedAt = new Date();
+      updateData.archived = true;
+      updateData.archivedAt = new Date();
+      updateData.archivedBy = req.user.email || 'Admin';
+    }
+    
+    if (status === 'rejected' && rejectionReason) {
+      updateData.rejectionReason = rejectionReason;
+    }
+    
+    if (reviewNotes) {
+      updateData.reviewNotes = reviewNotes;
+    }
+    
+    const result = await DocumentRequest.updateMany(
+      { _id: { $in: requestIds } },
+      updateData
+    );
+    
+    res.json({
+      success: true,
+      message: `Successfully updated ${result.modifiedCount} requests`,
+      modifiedCount: result.modifiedCount
+    });
+  } catch (error) {
+    console.error('Error bulk updating requests:', error);
+    res.status(500).json({ message: 'Error updating requests' });
+  }
+};
+
+// Admin: Get requests with advanced filtering
+exports.getFilteredRequests = async (req, res) => {
+  try {
+    const { 
+      status, 
+      documentType, 
+      priority, 
+      fromDate, 
+      toDate, 
+      page = 1, 
+      limit = 10,
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    // Build filter object
+    const filter = { archived: { $ne: true } };
+    
+    if (status) filter.status = status;
+    if (documentType) filter.documentType = documentType;
+    if (priority) filter.priority = priority;
+    
+    if (fromDate || toDate) {
+      filter.createdAt = {};
+      if (fromDate) filter.createdAt.$gte = new Date(fromDate);
+      if (toDate) filter.createdAt.$lte = new Date(toDate);
+    }
+    
+    // Calculate skip value for pagination
+    const skip = (page - 1) * limit;
+    
+    // Build sort object
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    const requests = await DocumentRequest.find(filter)
+      .populate('user', 'firstName lastName email')
+      .populate('reviewedBy', 'firstName lastName')
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit));
+    
+    const total = await DocumentRequest.countDocuments(filter);
+    
+    res.json({
+      success: true,
+      data: requests,
+      pagination: {
+        current: parseInt(page),
+        pages: Math.ceil(total / limit),
+        total,
+        limit: parseInt(limit)
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching filtered requests:', error);
+    res.status(500).json({ message: 'Error fetching requests' });
+  }
+};
+
+// Admin: Update processing step
+exports.updateProcessingStep = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { stepIndex, status, notes } = req.body;
+    
+    const request = await DocumentRequest.findById(requestId);
+    if (!request) {
+      return res.status(404).json({ message: 'Request not found' });
+    }
+    
+    if (stepIndex >= 0 && stepIndex < request.processingSteps.length) {
+      request.processingSteps[stepIndex].status = status;
+      request.processingSteps[stepIndex].notes = notes;
+      
+      if (status === 'completed') {
+        request.processingSteps[stepIndex].completedAt = new Date();
+      }
+      
+      await request.save();
+    }
+    
+    res.json({
+      success: true,
+      message: 'Processing step updated successfully',
+      request
+    });
+  } catch (error) {
+    console.error('Error updating processing step:', error);
+    res.status(500).json({ message: 'Error updating processing step' });
+  }
+};
+
+// Admin: Get dashboard analytics
+exports.getDashboardAnalytics = async (req, res) => {
+  try {
+    const { period = '30' } = req.query;
+    const daysAgo = parseInt(period);
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - daysAgo);
+    
+    // Get counts by status
+    const statusCounts = await DocumentRequest.aggregate([
+      { $match: { archived: { $ne: true } } },
+      { $group: { _id: '$status', count: { $sum: 1 } } }
+    ]);
+    
+    // Get counts by document type
+    const typeCounts = await DocumentRequest.aggregate([
+      { $match: { createdAt: { $gte: fromDate } } },
+      { $group: { _id: '$documentType', count: { $sum: 1 } } }
+    ]);
+    
+    // Get processing time averages
+    const avgProcessingTime = await DocumentRequest.aggregate([
+      { 
+        $match: { 
+          status: 'completed',
+          completedAt: { $exists: true },
+          createdAt: { $gte: fromDate }
+        }
+      },
+      {
+        $addFields: {
+          processingTime: {
+            $divide: [
+              { $subtract: ['$completedAt', '$createdAt'] },
+              1000 * 60 * 60 * 24 // Convert to days
+            ]
+          }
+        }
+      },
+      {
+        $group: {
+          _id: '$documentType',
+          avgDays: { $avg: '$processingTime' },
+          count: { $sum: 1 }
+        }
+      }
+    ]);
+    
+    // Get overdue requests
+    const overdueRequests = await DocumentRequest.find({
+      estimatedCompletionDate: { $lt: new Date() },
+      status: { $nin: ['completed', 'rejected'] },
+      archived: { $ne: true }
+    }).countDocuments();
+    
+    res.json({
+      success: true,
+      data: {
+        statusCounts: statusCounts.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        typeCounts: typeCounts.reduce((acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        }, {}),
+        avgProcessingTime,
+        overdueRequests,
+        period: daysAgo
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching analytics:', error);
+    res.status(500).json({ message: 'Error fetching analytics' });
   }
 };
 

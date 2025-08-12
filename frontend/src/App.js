@@ -30,10 +30,14 @@ import Form137StubDashboard from './admin/Form137StubDashboard';
 import AdminRequestDashboard from './admin/AdminRequestDashboard';
 import InquiriesDashboard from './admin/InquiriesDashboard';
 import Settings from './admin/Settings';
+import EnrollmentAdminDashboard from './admin/EnrollmentAdminDashboard';
+import DocumentAdminDashboard from './admin/DocumentAdminDashboard';
+import SectionManagement from './admin/SectionManagement';
 
 // Protected Route
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import SessionManager from './components/Auth/SessionManager';
+import RoleBasedDashboard from './components/RoleBasedDashboard';
 
 // Chatbot
 import EnhancedFloatingChatbot from './components/Chatbot/EnhancedFloatingChatbot';
@@ -152,28 +156,93 @@ function App() {
               }
             />
 
+            {/* Role-based dashboard redirect */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute>
+                  <RoleBasedDashboard />
+                </ProtectedRoute>
+              }
+            />
+
             {/* Admin Routes */}
+            {/* Super Admin Routes */}
             <Route
               path="/admin/dashboard"
               element={
-                <ProtectedRoute requireAdmin={true}>
+                <ProtectedRoute requireSuperAdmin={true}>
                   <AdminDashboard />
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/admin/archive"
+              path="/admin/settings"
               element={
-                <ProtectedRoute requireAdmin={true}>
+                <ProtectedRoute requireSuperAdmin={true}>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Document Admin Routes */}
+            <Route
+              path="/admin/documents"
+              element={
+                <ProtectedRoute requireDocumentAdmin={true}>
+                  <DocumentAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/inquiries"
+              element={
+                <ProtectedRoute requireDocumentAdmin={true}>
+                  <InquiriesDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/document-archive"
+              element={
+                <ProtectedRoute requireDocumentAdmin={true}>
+                  <Archive />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Enrollment Admin Routes */}
+            <Route
+              path="/admin/enrollments"
+              element={
+                <ProtectedRoute requireEnrollmentAdmin={true}>
+                  <EnrollmentAdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/enrollment-archive"
+              element={
+                <ProtectedRoute requireEnrollmentAdmin={true}>
                   <Archive />
                 </ProtectedRoute>
               }
             />
             <Route
-              path="/admin/enrollments"
+              path="/admin/sections"
+              element={
+                <ProtectedRoute requireEnrollmentAdmin={true}>
+                  <SectionManagement />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Shared Admin Routes (any admin can access) */}
+            <Route
+              path="/admin/archive"
               element={
                 <ProtectedRoute requireAdmin={true}>
-                  <EnrollmentDashboard />
+                  <Archive />
                 </ProtectedRoute>
               }
             />
@@ -190,22 +259,6 @@ function App() {
               element={
                 <ProtectedRoute requireAdmin={true}>
                   <AdminRequestDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/inquiries"
-              element={
-                <ProtectedRoute requireAdmin={true}>
-                  <InquiriesDashboard />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/admin/settings"
-              element={
-                <ProtectedRoute requireAdmin={true}>
-                  <Settings />
                 </ProtectedRoute>
               }
             />

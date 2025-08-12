@@ -15,53 +15,165 @@ import {
   Dashboard as DashboardIcon,
   School as EnrollmentIcon,
   Archive as ArchiveIcon,
-  Assignment as Form137Icon,
   Settings as SettingsIcon,
   PeopleAlt as InquiriesIcon,
   Description as DocumentIcon,
+  SupervisorAccount as SuperAdminIcon,
 } from '@mui/icons-material';
 import { Link as RouterLink, useLocation } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const drawerWidth = 280;
 
 const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
   const location = useLocation();
+  const { user } = useAuth();
 
-  const menuItems = [
-    {
-      text: 'Dashboard',
-      icon: <DashboardIcon />,
-      path: '/admin/dashboard',
-      description: 'Overview and document requests'
-    },
-    {
-      text: 'Student Enrollments',
-      icon: <EnrollmentIcon />,
-      path: '/admin/enrollments',
-      description: 'Manage student enrollment applications'
-    },
-    {
-      text: 'View Archive',
-      icon: <ArchiveIcon />,
-      path: '/admin/archive',
-      description: 'Archived documents and inquiries'
-    },
-    {
-      text: 'Settings',
-      icon: <SettingsIcon />,
-      path: '/admin/settings',
-      description: 'System settings and configuration'
-    },
-  ];
+  // Define menu items based on user role
+  const getMenuItems = (userRole) => {
+    if (userRole === 'super-admin') {
+      return [
+        {
+          text: 'Super Admin Dashboard',
+          icon: <SuperAdminIcon />,
+          path: '/admin/dashboard',
+          description: 'Complete system overview'
+        },
+        {
+          text: 'Document Management',
+          icon: <DocumentIcon />,
+          path: '/admin/documents',
+          description: 'Manage document requests'
+        },
+        {
+          text: 'Enrollment Management',
+          icon: <EnrollmentIcon />,
+          path: '/admin/enrollments',
+          description: 'Manage student enrollments'
+        },
+        {
+          text: 'View Archive',
+          icon: <ArchiveIcon />,
+          path: '/admin/archive',
+          description: 'Archived documents and inquiries'
+        },
+        {
+          text: 'Settings',
+          icon: <SettingsIcon />,
+          path: '/admin/settings',
+          description: 'System settings and configuration'
+        },
+      ];
+    } else if (userRole === 'admin-document') {
+      return [
+        {
+          text: 'Document Dashboard',
+          icon: <DocumentIcon />,
+          path: '/admin/documents',
+          description: 'Manage document requests'
+        },
+        {
+          text: 'Inquiries',
+          icon: <InquiriesIcon />,
+          path: '/admin/inquiries',
+          description: 'Handle student inquiries'
+        },
+        {
+          text: 'Document Archive',
+          icon: <ArchiveIcon />,
+          path: '/admin/document-archive',
+          description: 'View archived documents'
+        },
+      ];
+    } else if (userRole === 'admin-enrollment') {
+      return [
+        {
+          text: 'Enrollment Dashboard',
+          icon: <EnrollmentIcon />,
+          path: '/admin/enrollments',
+          description: 'Manage student enrollments'
+        },
+        {
+          text: 'Manage Sections',
+          icon: <SettingsIcon />, // You can use a different icon if preferred
+          path: '/admin/sections',
+          description: 'Create and manage sections for each grade level'
+        },
+        {
+          text: 'Enrollment Archive',
+          icon: <ArchiveIcon />,
+          path: '/admin/enrollment-archive',
+          description: 'View archived enrollments'
+        },
+      ];
+    } else {
+      return [
+        {
+          text: 'Dashboard',
+          icon: <DashboardIcon />,
+          path: '/admin/dashboard',
+          description: 'Overview and document requests'
+        },
+        {
+          text: 'Student Enrollments',
+          icon: <EnrollmentIcon />,
+          path: '/admin/enrollments',
+          description: 'Manage student enrollment applications'
+        },
+        {
+          text: 'View Archive',
+          icon: <ArchiveIcon />,
+          path: '/admin/archive',
+          description: 'Archived documents and inquiries'
+        },
+        {
+          text: 'Settings',
+          icon: <SettingsIcon />,
+          path: '/admin/settings',
+          description: 'System settings and configuration'
+        },
+      ];
+    }
+  };
+
+  const menuItems = getMenuItems(user?.role);
 
   const isSelected = (path) => {
     return location.pathname === path;
   };
 
+  const getRoleDisplayName = (role) => {
+    switch (role) {
+      case 'super-admin':
+        return 'Super Administrator';
+      case 'admin-document':
+        return 'Document Administrator';
+      case 'admin-enrollment':
+        return 'Enrollment Administrator';
+      case 'admin':
+        return 'Administrator';
+      default:
+        return 'Administrator';
+    }
+  };
+
+  const getRoleColor = (role) => {
+    switch (role) {
+      case 'super-admin':
+        return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+      case 'admin-document':
+        return 'linear-gradient(135deg, #2196f3 0%, #673ab7 100%)';
+      case 'admin-enrollment':
+        return 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)';
+      default:
+        return 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+    }
+  };
+
   const drawerContent = (
     <Box sx={{ 
       height: '100%',
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: getRoleColor(user?.role),
       color: 'white',
       position: 'relative',
       display: 'flex',
@@ -78,7 +190,6 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
       }
     }}>
       <Box sx={{ position: 'relative', zIndex: 2, height: '100%', display: 'flex', flexDirection: 'column' }}>
-        {/* Fixed Header */}
         <Toolbar sx={{ 
           background: 'rgba(255,255,255,0.1)', 
           backdropFilter: 'blur(10px)',
@@ -97,7 +208,10 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
               width: 48,
               height: 48
             }}>
-              <DocumentIcon sx={{ color: 'white', fontSize: 24 }} />
+              {user?.role === 'super-admin' ? <SuperAdminIcon sx={{ color: 'white', fontSize: 24 }} /> :
+               user?.role === 'admin-document' ? <DocumentIcon sx={{ color: 'white', fontSize: 24 }} /> :
+               user?.role === 'admin-enrollment' ? <EnrollmentIcon sx={{ color: 'white', fontSize: 24 }} /> :
+               <DocumentIcon sx={{ color: 'white', fontSize: 24 }} />}
             </Box>
             <Box>
               <Typography variant="h6" noWrap component="div" sx={{ 
@@ -108,7 +222,7 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
                 WebkitBackgroundClip: 'text',
                 WebkitTextFillColor: 'transparent'
               }}>
-                Admin Panel
+                {getRoleDisplayName(user?.role)}
               </Typography>
               <Typography variant="caption" sx={{ 
                 color: 'rgba(255,255,255,0.8)',
@@ -122,7 +236,6 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
         
         <Divider sx={{ borderColor: 'rgba(255,255,255,0.2)', flexShrink: 0 }} />
         
-        {/* Scrollable Menu Items */}
         <Box sx={{ 
           flex: 1, 
           overflowY: 'auto',
@@ -130,8 +243,8 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
           '&::-webkit-scrollbar': {
             display: 'none',
           },
-          scrollbarWidth: 'none', // Firefox
-          msOverflowStyle: 'none', // Internet Explorer and Edge
+          scrollbarWidth: 'none',
+          msOverflowStyle: 'none',
         }}>
           <List sx={{ px: 2, py: 3 }}>
             {menuItems.map((item, index) => (
@@ -201,14 +314,13 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
                         {item.description}
                       </Typography>
                     }
-                    />
+                  />
                 </ListItemButton>
               </ListItem>
             ))}
           </List>
         </Box>
 
-        {/* Fixed Footer */}
         <Box sx={{ 
           flexShrink: 0,
           background: 'rgba(0,0,0,0.2)',
@@ -230,7 +342,16 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
             fontSize: '0.75rem',
             mt: 0.5
           }}>
-            Document Management System v1.3
+            Document Management System v2.0
+          </Typography>
+          <Typography variant="caption" sx={{ 
+            color: 'rgba(255,255,255,0.6)',
+            display: 'block',
+            fontSize: '0.7rem',
+            mt: 0.5,
+            fontStyle: 'italic'
+          }}>
+            Logged in as: {getRoleDisplayName(user?.role)}
           </Typography>
         </Box>
       </Box>
