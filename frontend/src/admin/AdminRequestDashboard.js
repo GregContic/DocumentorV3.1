@@ -87,103 +87,22 @@ const AdminRequestDashboard = () => {
   const fetchRequests = async () => {
     setLoading(true);
     try {
-      // Simulate API call - replace with actual API endpoints
-      const mockRequests = [
-        {
-          id: 1,
-          type: 'Form 137',
-          requestId: 'FORM137-1704067200000',
-          status: 'pending',
-          submittedAt: '2024-01-01T10:00:00Z',
-          studentName: 'John M. Doe',
-          userId: '123',
-          formData: {
-            surname: 'Doe',
-            firstName: 'John',
-            middleName: 'M',
-            sex: 'Male',
-            dateOfBirth: '2005-01-01',
-            barangay: 'Sample Barangay',
-            city: 'Sample City',
-            province: 'Sample Province',
-            learnerReferenceNumber: '123456789012',
-            lastGradeLevel: 'Grade 11',
-            strand: 'STEM',
-            lastAttendedYear: '2023-2024',
-            receivingSchool: 'Sample University',
-            receivingSchoolAddress: 'Sample Address',
-            purpose: 'College Application',
-            parentGuardianName: 'Jane Doe',
-            parentGuardianAddress: 'Sample Address',
-            parentGuardianContact: '09123456789'
-          }
+      const token = localStorage.getItem('token');
+      const res = await fetch('http://localhost:5000/api/documents/admin/documents/requests', {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
-        {
-          id: 2,
-          type: 'Form 138',
-          requestId: 'FORM138-1704153600000',
-          status: 'approved',
-          submittedAt: '2024-01-02T10:00:00Z',
-          studentName: 'Jane A. Smith',
-          userId: '124',
-          formData: {
-            surname: 'Smith',
-            firstName: 'Jane',
-            middleName: 'A',
-            sex: 'Female',
-            dateOfBirth: '2005-03-15',
-            placeOfBirth: 'Sample City',
-            lrn: '123456789013',
-            barangay: 'Another Barangay',
-            city: 'Another City',
-            province: 'Another Province',
-            gradeLevel: 'Grade 12',
-            strand: 'ABM',
-            schoolYear: '2023-2024',
-            section: 'Einstein',
-            adviser: 'Ms. Smith',
-            purpose: 'Scholarship Application',
-            numberOfCopies: '2',
-            parentName: 'Robert Smith',
-            parentAddress: 'Another Address',
-            parentContact: '09123456788',
-            downloadUrl: '/mock-report-card.pdf',
-            pickupDate: null
-          }
-        },
-        {
-          id: 3,
-          type: 'Form 137',
-          requestId: 'FORM137-1704240000000',
-          status: 'approved',
-          submittedAt: '2024-01-03T14:30:00Z',
-          studentName: 'Michael B. Johnson',
-          userId: '125',
-          formData: {
-            surname: 'Johnson',
-            firstName: 'Michael',
-            middleName: 'B',
-            sex: 'Male',
-            dateOfBirth: '2004-11-20',
-            barangay: 'Central Barangay',
-            city: 'Central City',
-            province: 'Central Province',
-            learnerReferenceNumber: '123456789014',
-            lastGradeLevel: 'Grade 12',
-            strand: 'HUMSS',
-            lastAttendedYear: '2023-2024',
-            receivingSchool: 'Central University',
-            receivingSchoolAddress: 'Central Address',
-            purpose: 'University Transfer',
-            parentGuardianName: 'Sarah Johnson',
-            parentGuardianAddress: 'Central Address',
-            parentGuardianContact: '09123456787'
-          }
-        }
-      ];
-      setRequests(mockRequests);
+      });
+      if (!res.ok) {
+        throw new Error('Failed to fetch requests');
+      }
+      const data = await res.json();
+      // Optionally, map/transform data here if backend format differs from frontend expectation
+      setRequests(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Error fetching requests:', error);
+      setRequests([]);
     } finally {
       setLoading(false);
     }

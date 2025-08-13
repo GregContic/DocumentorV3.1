@@ -17,7 +17,8 @@ exports.authenticate = (req, res, next) => {
 };
 
 exports.authorizeAdmin = (req, res, next) => {
-  const allowedAdminRoles = ['admin', 'enrollment-admin', 'superadmin', 'admin-enrollment'];
+  // Accept all valid admin roles from the User model
+  const allowedAdminRoles = ['admin', 'admin-enrollment', 'admin-document', 'super-admin', 'superadmin', 'enrollment-admin'];
   console.log('authorizeAdmin middleware: req.user =', req.user);
   if (!req.user) {
     return res.status(401).json({ message: 'Unauthorized: No user found' });
