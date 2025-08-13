@@ -296,6 +296,11 @@ const EnrollmentStatus = () => {
               <Typography variant="body2">
                 Welcome! You are now officially enrolled. Check your school email for class schedules and other important information.
               </Typography>
+              {enrollmentData.section && (
+                <Typography variant="body2" sx={{ mt: 2 }}>
+                  <strong>Assigned Section:</strong> {enrollmentData.section}
+                </Typography>
+              )}
             </Alert>
           )}
 
