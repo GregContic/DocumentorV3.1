@@ -29,6 +29,7 @@ const gradeLevels = [
 
 const SectionManagement = () => {
   const [sections, setSections] = useState([]);
+  const [sectionStudentCounts, setSectionStudentCounts] = useState({});
   const [form, setForm] = useState({ name: '', gradeLevel: '', adviser: '', capacity: 40 });
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState('');
@@ -38,13 +39,16 @@ const SectionManagement = () => {
   const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
   const handleManageSection = async (section) => {
+    // Always refresh sections and student counts before opening modal
+    await fetchSections();
     setSelectedSection(section);
     setManageOpen(true);
     setStudentsLoading(true);
     setEnrolledStudents([]);
     try {
       const token = localStorage.getItem('token');
-      const res = await fetch(`http://localhost:5000/api/enrollments?section=${encodeURIComponent(section.name)}`, {
+      // Fetch all enrollments for this section, regardless of status
+      const res = await fetch(`http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(section.name)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -69,6 +73,36 @@ const SectionManagement = () => {
   useEffect(() => {
     fetchSections();
   }, []);
+
+  // Fetch student counts for all sections after sections are loaded
+  useEffect(() => {
+    if (sections.length > 0) {
+      fetchSectionStudentCounts();
+    }
+  }, [sections]);
+
+  // Helper to fetch student count for each section
+  const fetchSectionStudentCounts = async () => {
+    const token = localStorage.getItem('token');
+    const counts = {};
+    await Promise.all(sections.map(async (section) => {
+      try {
+        // Fetch all enrollments for this section, regardless of status
+        const res = await fetch(`http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(section.name)}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          counts[section._id] = Array.isArray(data) ? data.length : 0;
+        } else {
+          counts[section._id] = 0;
+        }
+      } catch {
+        counts[section._id] = 0;
+      }
+    }));
+    setSectionStudentCounts(counts);
+  };
 
   const fetchSections = async () => {
     setLoading(true);
@@ -162,7 +196,11 @@ const SectionManagement = () => {
                   <TableCell>{section.name}</TableCell>
                   <TableCell>{section.gradeLevel}</TableCell>
                   <TableCell>{section.adviser}</TableCell>
-                  <TableCell>{section.capacity}</TableCell>
+                  <TableCell>
+                    {sectionStudentCounts[section._id] !== undefined
+                      ? `${sectionStudentCounts[section._id]}/${section.capacity}`
+                      : `0/${section.capacity}`}
+                  </TableCell>
                   <TableCell>
                     <Button variant="outlined" size="small" onClick={() => handleManageSection(section)}>
                       Manage

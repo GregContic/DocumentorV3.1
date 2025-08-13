@@ -158,13 +158,18 @@ exports.getAllEnrollments = async (req, res) => {
 exports.updateEnrollmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
-    const { status, reviewNotes, rejectionReason } = req.body;
-    
+    const { status, reviewNotes, rejectionReason, section } = req.body;
+
     const updateData = {
       status,
       reviewedBy: req.user.userId,
       reviewedAt: new Date()
     };
+
+    // Add/Update section if provided
+    if (section) {
+      updateData.section = section;
+    }
 
     // Add rejection reason if status is rejected
     if (status === 'rejected' && rejectionReason) {
@@ -175,7 +180,7 @@ exports.updateEnrollmentStatus = async (req, res) => {
     if (reviewNotes) {
       updateData.reviewNotes = reviewNotes;
     }
-    
+
     const enrollment = await Enrollment.findByIdAndUpdate(id, updateData, { new: true })
       .populate('user', 'firstName lastName email')
       .populate('reviewedBy', 'firstName lastName');

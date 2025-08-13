@@ -79,6 +79,11 @@ const EnrollmentAdminDashboard = () => {
   const [selectedSectionId, setSelectedSectionId] = useState('');
   const [sectionFetchError, setSectionFetchError] = useState('');
 
+  // Add useEffect to fetch enrollments on component mount
+  useEffect(() => {
+    fetchEnrollments();
+  }, []);
+
   const handleOpenAssignSection = async (enrollment) => {
     setSelectedEnrollmentForSection(enrollment);
     setAssignDialogOpen(true);
@@ -87,21 +92,30 @@ const EnrollmentAdminDashboard = () => {
     setSectionFetchError('');
     try {
       const token = localStorage.getItem('token');
-      const gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel;
-      const res = await fetch(`http://localhost:5000/api/sections/grade/${encodeURIComponent(gradeLevel)}`, {
+  let gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel;
+  // Guarantee match for Grade 11 and Grade 12
+  if (gradeLevel === '11') gradeLevel = 'Grade 11';
+  if (gradeLevel === '12') gradeLevel = 'Grade 12';
+  console.log('[AssignSection] gradeLevel sent to backend:', gradeLevel);
+  const url = `http://localhost:5000/api/sections/grade/${encodeURIComponent(gradeLevel)}`;
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
+        console.log('[AssignSection] sections response from backend:', data);
         setAvailableSections(Array.isArray(data) ? data : []);
         if (!data.length) {
           setSectionFetchError('No sections currently created for this grade. Create one on the Manage Sections page.');
         }
       } else {
         setSectionFetchError('Failed to fetch sections.');
+        const errorText = await res.text();
+        console.error('[AssignSection] Backend error:', errorText);
       }
     } catch (err) {
       setSectionFetchError('Failed to fetch sections.');
+      console.error('[AssignSection] Fetch error:', err);
     }
   };
 
@@ -118,6 +132,9 @@ const EnrollmentAdminDashboard = () => {
     setAssigning(true);
     try {
       const token = localStorage.getItem('token');
+      // Always use the exact, trimmed section name for assignment
+      const selectedSectionObj = availableSections.find(s => s._id === selectedSectionId);
+      const sectionName = selectedSectionObj && selectedSectionObj.name ? selectedSectionObj.name.trim() : '';
       const res = await fetch(`http://localhost:5000/api/enrollments/${selectedEnrollmentForSection._id}/status`, {
         method: 'PUT',
         headers: {
@@ -126,8 +143,8 @@ const EnrollmentAdminDashboard = () => {
         },
         body: JSON.stringify({
           status: 'enrolled',
-          section: availableSections.find(s => s._id === selectedSectionId)?.name || '',
-          reviewNotes: `Assigned to section ${availableSections.find(s => s._id === selectedSectionId)?.name || ''}`,
+          section: sectionName,
+          reviewNotes: `Assigned to section ${sectionName}`,
         }),
       });
       if (res.ok) {
@@ -151,6 +168,11 @@ const EnrollmentAdminDashboard = () => {
       setError(null);
       
       const token = localStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found. Please log in again.');
+      }
+
+      console.log('Fetching enrollments from API...');
       const response = await fetch('http://localhost:5000/api/enrollments/admin', {
         method: 'GET',
         headers: {
@@ -159,27 +181,33 @@ const EnrollmentAdminDashboard = () => {
         },
       });
 
+      console.log('Response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error(`Failed to fetch enrollments: ${response.status}`);
+        const errorText = await response.text();
+        console.error('API Error:', errorText);
+        throw new Error(`Failed to fetch enrollments: ${response.status} - ${errorText}`);
       }
 
       const data = await response.json();
-      setEnrollments(data);
+      console.log('Fetched enrollments:', data);
+      setEnrollments(Array.isArray(data) ? data : []);
       
       // Calculate stats
+      const enrollmentArray = Array.isArray(data) ? data : [];
       const newStats = {
-        total: data.length,
-        pending: data.filter(e => e.status === 'pending').length,
-        approved: data.filter(e => e.status === 'approved').length,
-        rejected: data.filter(e => e.status === 'rejected').length,
-        enrolled: data.filter(e => e.status === 'enrolled').length,
-        underReview: data.filter(e => e.status === 'under-review').length
+        total: enrollmentArray.length,
+        pending: enrollmentArray.filter(e => e.status === 'pending').length,
+        approved: enrollmentArray.filter(e => e.status === 'approved').length,
+        rejected: enrollmentArray.filter(e => e.status === 'rejected').length,
+        enrolled: enrollmentArray.filter(e => e.status === 'enrolled').length,
+        underReview: enrollmentArray.filter(e => e.status === 'under-review').length
       };
       setStats(newStats);
       
     } catch (error) {
       console.error('Error fetching enrollments:', error);
-      setError('Failed to load enrollments. Please try again later.');
+      setError(error.message || 'Failed to load enrollments. Please check your connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -471,6 +499,34 @@ const EnrollmentAdminDashboard = () => {
           >
             View Enrollment Archive
           </Button>
+          
+          <Button
+            onClick={fetchEnrollments}
+            variant="outlined"
+            size="large"
+            disabled={loading}
+            sx={{
+              borderColor: '#2196f3',
+              color: '#2196f3',
+              backgroundColor: 'white',
+              borderWidth: 2,
+              borderRadius: 2,
+              px: 4,
+              py: 1.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '1rem',
+              '&:hover': {
+                borderColor: '#1976d2',
+                backgroundColor: '#e3f2fd',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 4px 6px -1px rgba(33, 150, 243, 0.2)',
+              },
+              transition: 'all 0.2s ease-in-out',
+            }}
+          >
+            {loading ? <CircularProgress size={20} color="inherit" /> : 'Refresh Data'}
+          </Button>
         </Box>
 
         {error && (
@@ -700,8 +756,8 @@ const EnrollmentAdminDashboard = () => {
                             color: '#1f2937',
                             borderBottom: 'none'
                           }}>
-                            {enrollment.firstName && enrollment.lastName 
-                              ? `${enrollment.firstName} ${enrollment.lastName}` 
+                            {enrollment.firstName && enrollment.surname
+                              ? `${enrollment.firstName} ${enrollment.surname}`
                               : enrollment.studentName || 'N/A'}
                           </TableCell>
                           <TableCell sx={{ 
@@ -709,7 +765,7 @@ const EnrollmentAdminDashboard = () => {
                             color: '#6b7280',
                             borderBottom: 'none'
                           }}>
-                            {enrollment.user?.email}
+                            {enrollment.user?.email || enrollment.emailAddress || 'N/A'}
                           </TableCell>
                           <TableCell sx={{ 
                             py: 2.5, 
@@ -1126,7 +1182,7 @@ const EnrollmentAdminDashboard = () => {
               px: 4,
             }}
           >
-            <Typography variant="h5" fontWeight="600">
+            <Typography variant="h5" component="span" fontWeight="600">
               Assign Section
             </Typography>
             <Typography variant="body2" sx={{ mt: 1, opacity: 0.9 }}>

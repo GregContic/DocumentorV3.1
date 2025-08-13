@@ -27,7 +27,15 @@ router.get('/', authenticate, authorizeAdmin, async (req, res) => {
 // Get sections by grade level
 router.get('/grade/:gradeLevel', authenticate, authorizeAdmin, async (req, res) => {
   try {
-    const sections = await Section.find({ gradeLevel: req.params.gradeLevel });
+    const gradeParam = req.params.gradeLevel;
+    const gradeNum = gradeParam.replace(/grade\s*/i, '');
+    const sections = await Section.find({
+      $or: [
+        { gradeLevel: { $regex: '^' + gradeNum + '$', $options: 'i' } },
+        { gradeLevel: { $regex: '^grade\s*' + gradeNum + '$', $options: 'i' } },
+        { gradeLevel: { $regex: '^' + gradeParam + '$', $options: 'i' } }
+      ]
+    });
     res.json(sections);
   } catch (err) {
     res.status(500).json({ error: err.message });
