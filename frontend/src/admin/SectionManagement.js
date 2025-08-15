@@ -213,7 +213,7 @@ const SectionManagement = () => {
         </Paper>
 
         {/* Manage Section Modal */}
-        <Dialog open={manageOpen} onClose={handleCloseManage} maxWidth="md" fullWidth>
+        <Dialog open={manageOpen} onClose={handleCloseManage} maxWidth="xl" fullWidth>
           <DialogTitle>Manage Section: {selectedSection?.name}</DialogTitle>
           <DialogContent>
             <Typography variant="subtitle1" sx={{ mb: 2 }}>
@@ -226,26 +226,58 @@ const SectionManagement = () => {
             ) : enrolledStudents.length === 0 ? (
               <Typography>No students enrolled in this section.</Typography>
             ) : (
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Name</TableCell>
-                    <TableCell>Grade Level</TableCell>
-                    <TableCell>Email</TableCell>
-                    <TableCell>Status</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {enrolledStudents.map(student => (
-                    <TableRow key={student._id}>
-                      <TableCell>{student.firstName} {student.surname}</TableCell>
-                      <TableCell>{student.gradeLevel || student.gradeToEnroll}</TableCell>
-                      <TableCell>{student.user?.email || student.emailAddress}</TableCell>
-                      <TableCell>{student.status}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <Grid container spacing={3} alignItems="flex-start">
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Male Students</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'male').length === 0 ? (
+                        <TableRow><TableCell colSpan={3}>No male students.</TableCell></TableRow>
+                      ) : (
+                        enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'male').map(student => (
+                          <TableRow key={student._id}>
+                            <TableCell>{student.firstName} {student.surname}</TableCell>
+                            <TableCell>{student.user?.email || student.emailAddress}</TableCell>
+                            <TableCell>{student.status}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="subtitle2" sx={{ mb: 1 }}>Female Students</Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
+                        <TableCell>Status</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'female').length === 0 ? (
+                        <TableRow><TableCell colSpan={3}>No female students.</TableCell></TableRow>
+                      ) : (
+                        enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'female').map(student => (
+                          <TableRow key={student._id}>
+                            <TableCell>{student.firstName} {student.surname}</TableCell>
+                            <TableCell>{student.user?.email || student.emailAddress}</TableCell>
+                            <TableCell>{student.status}</TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </Grid>
+              </Grid>
             )}
           </DialogContent>
           <DialogActions>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import * as XLSX from 'xlsx';
 import {
   Container,
   Paper,
@@ -50,11 +51,66 @@ const statusColors = {
   completed: 'info',
 };
 const EnrollmentAdminDashboard = () => {
+  // Export to Excel handler
+  const handleExportToExcel = () => {
+    // Always use the full enrollments array, not paginated/filtered
+    const accepted = enrollments.filter(e => e.status === 'enrolled');
+    if (accepted.length === 0) {
+      setError('No accepted enrollees to export.');
+      return;
+    }
+    // Helper to calculate age from date of birth
+    function calculateAge(dobStr) {
+      if (!dobStr) return '';
+      const dob = new Date(dobStr);
+      if (isNaN(dob.getTime())) return '';
+      const today = new Date();
+      let age = today.getFullYear() - dob.getFullYear();
+      const m = today.getMonth() - dob.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+        age--;
+      }
+      return age;
+    }
+    // Map to requested fields for Excel
+    const data = accepted.map(e => ({
+      'Learner Reference Number': e.learnerReferenceNumber || '',
+      'Surname': e.surname || '',
+      'First Name': e.firstName || '',
+      'Middle Name': e.middleName || '',
+      'Extension': e.extension || e.extensionName || '',
+      'Date of Birth': e.dateOfBirth || '',
+      'Place of Birth': e.placeOfBirth || '',
+      'Sex': e.sex || '',
+      'Age': calculateAge(e.dateOfBirth),
+      'Religion': e.religion || '',
+      'Citizenship': e.citizenship || '',
+      'House Number': e.houseNumber || '',
+      'Street': e.street || '',
+      'Barangay': e.barangay || '',
+      'City': e.city || '',
+      'Province': e.province || '',
+      'Zip Code': e.zipCode || '',
+      'Contact Number': e.contactNumber || '',
+      'Email Address': (e.user?.email || e.emailAddress || ''),
+      'Last School Attended': e.lastSchoolAttended || '',
+      'School Address': e.schoolAddress || '',
+      'Grade Level': e.gradeToEnroll || e.gradeLevel || '',
+      'School Year': e.schoolYear || '',
+      "Father's Name": e.fatherName || '',
+      "Mother's Name": e.motherName || ''
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Accepted Enrollees');
+    XLSX.writeFile(workbook, 'accepted_enrollees.xlsx');
+  };
   const [enrollments, setEnrollments] = useState([]);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [gradeFilter, setGradeFilter] = useState('all');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedEnrollment, setSelectedEnrollment] = useState(null);
@@ -69,7 +125,8 @@ const EnrollmentAdminDashboard = () => {
     total: 0,
     pending: 0,
     approved: 0,
-    rejected: 0
+    rejected: 0,
+    assigned: 0
   });
   // Assign Section modal states
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
@@ -200,8 +257,7 @@ const EnrollmentAdminDashboard = () => {
         pending: enrollmentArray.filter(e => e.status === 'pending').length,
         approved: enrollmentArray.filter(e => e.status === 'approved').length,
         rejected: enrollmentArray.filter(e => e.status === 'rejected').length,
-        enrolled: enrollmentArray.filter(e => e.status === 'enrolled').length,
-        underReview: enrollmentArray.filter(e => e.status === 'under-review').length
+        assigned: enrollmentArray.filter(e => e.status === 'enrolled' && e.section && e.section.trim() !== '').length
       };
       setStats(newStats);
       
@@ -368,16 +424,21 @@ const EnrollmentAdminDashboard = () => {
       ? `${enrollment.firstName} ${enrollment.lastName}` 
       : '';
     const enrollmentNumber = enrollment.enrollmentNumber || '';
-    const gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel || '';
+    let gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel || '';
     const learnerReferenceNumber = enrollment.learnerReferenceNumber || '';
-    
+
+    // Normalize grade level for comparison
+    let normalizedGrade = gradeLevel.trim();
+    if (/^\d+$/.test(normalizedGrade)) normalizedGrade = `Grade ${normalizedGrade}`;
+
     const matchesSearch = studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       enrollmentNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       learnerReferenceNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       gradeLevel.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesStatus = statusFilter === 'all' || enrollment.status === statusFilter;
-    return matchesSearch && matchesStatus;
+    const matchesGrade = gradeFilter === 'all' || normalizedGrade === gradeFilter;
+    return matchesSearch && matchesStatus && matchesGrade;
   });
 
   return (
@@ -428,7 +489,7 @@ const EnrollmentAdminDashboard = () => {
 
         {/* Stats Cards */}
         <Grid container spacing={3} sx={{ mb: 4 }}>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <StatsCard
               title="Total Enrollments"
               value={stats.total}
@@ -436,7 +497,7 @@ const EnrollmentAdminDashboard = () => {
               color="primary"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <StatsCard
               title="Pending Review"
               value={stats.pending}
@@ -444,7 +505,7 @@ const EnrollmentAdminDashboard = () => {
               color="warning"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <StatsCard
               title="Approved"
               value={stats.approved}
@@ -452,12 +513,20 @@ const EnrollmentAdminDashboard = () => {
               color="success"
             />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid item xs={12} sm={6} md={2.4}>
             <StatsCard
               title="Rejected"
               value={stats.rejected}
               icon={<CancelIcon />}
               color="error"
+            />
+          </Grid>
+          <Grid item xs={12} sm={6} md={2.4}>
+            <StatsCard
+              title="Assigned to a Section"
+              value={stats.assigned}
+              icon={<AssignmentIcon />}
+              color="info"
             />
           </Grid>
         </Grid>
@@ -498,6 +567,32 @@ const EnrollmentAdminDashboard = () => {
             }}
           >
             View Enrollment Archive
+          </Button>
+
+          <Button
+            variant="contained"
+            color="success"
+            onClick={handleExportToExcel}
+            sx={{
+              borderRadius: 2,
+              px: 4,
+              py: 1.5,
+              fontWeight: 600,
+              fontSize: '1rem',
+              textTransform: 'none',
+              background: 'linear-gradient(135deg, #4caf50 0%, #8bc34a 100%)',
+              color: 'white',
+              boxShadow: '0 4px 12px rgba(76, 175, 80, 0.15)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #388e3c 0%, #2e7d32 100%)',
+                color: 'white',
+                transform: 'translateY(-1px)',
+                boxShadow: '0 6px 16px rgba(76, 175, 80, 0.2)',
+              },
+              transition: 'all 0.2s ease-in-out',
+            }}
+          >
+            Export Accepted Enrollees to Excel
           </Button>
           
           <Button
@@ -567,7 +662,7 @@ const EnrollmentAdminDashboard = () => {
                 Search & Filter Enrollments
               </Typography>
               <Grid container spacing={3}>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
                     placeholder="Search by student name or grade level..."
@@ -595,7 +690,7 @@ const EnrollmentAdminDashboard = () => {
                     }}
                   />
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid item xs={12} md={4}>
                   <TextField
                     fullWidth
                     select
@@ -617,6 +712,33 @@ const EnrollmentAdminDashboard = () => {
                     <MenuItem value="pending">Pending</MenuItem>
                     <MenuItem value="approved">Approved</MenuItem>
                     <MenuItem value="rejected">Rejected</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    fullWidth
+                    select
+                    label="Filter by Grade Level"
+                    value={gradeFilter}
+                    onChange={(e) => setGradeFilter(e.target.value)}
+                    sx={{
+                      '& .MuiOutlinedInput-root': {
+                        borderRadius: 2,
+                        backgroundColor: '#f9fafb',
+                        '&.Mui-focused fieldset': {
+                          borderColor: '#4caf50',
+                          borderWidth: 2,
+                        },
+                      },
+                    }}
+                  >
+                    <MenuItem value="all">All Grades</MenuItem>
+                    <MenuItem value="Grade 7">Grade 7</MenuItem>
+                    <MenuItem value="Grade 8">Grade 8</MenuItem>
+                    <MenuItem value="Grade 9">Grade 9</MenuItem>
+                    <MenuItem value="Grade 10">Grade 10</MenuItem>
+                    <MenuItem value="Grade 11">Grade 11</MenuItem>
+                    <MenuItem value="Grade 12">Grade 12</MenuItem>
                   </TextField>
                 </Grid>
               </Grid>
@@ -977,62 +1099,96 @@ const EnrollmentAdminDashboard = () => {
               Enrollment Application Details
             </Typography>
           </DialogTitle>
-          <DialogContent sx={{ p: 4 }}>
+          <DialogContent sx={{ p: 4, maxHeight: '70vh', overflowY: 'auto' }}>
             {enrollmentDetails && (
               <Grid container spacing={3}>
+                {/* Student Information */}
                 <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Student Name
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.studentName}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Grade Level
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.gradeLevel}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Parent/Guardian
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.parentGuardianName}
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Student Information</Typography>
+                  <Typography><b>Learner Reference Number:</b> {enrollmentDetails.learnerReferenceNumber || ''}</Typography>
+                  <Typography><b>Surname:</b> {enrollmentDetails.surname || ''}</Typography>
+                  <Typography><b>First Name:</b> {enrollmentDetails.firstName || ''}</Typography>
+                  <Typography><b>Middle Name:</b> {enrollmentDetails.middleName || ''}</Typography>
+                  <Typography><b>Extension:</b> {enrollmentDetails.extension || ''}</Typography>
+                  <Typography><b>Date of Birth:</b> {enrollmentDetails.dateOfBirth || ''}</Typography>
+                  <Typography><b>Place of Birth:</b> {enrollmentDetails.placeOfBirth || ''}</Typography>
+                  <Typography><b>Sex:</b> {enrollmentDetails.sex || ''}</Typography>
+                  <Typography><b>Age:</b> {enrollmentDetails.age || ''}</Typography>
+                  <Typography><b>Religion:</b> {enrollmentDetails.religion || ''}</Typography>
+                  <Typography><b>Citizenship:</b> {enrollmentDetails.citizenship || ''}</Typography>
                 </Grid>
-                
+                {/* Address Information */}
                 <Grid item xs={12} md={6}>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Email Address
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.user?.email}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Section
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.section}
-                  </Typography>
-                  
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Contact Number
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500} sx={{ mb: 2 }}>
-                    {enrollmentDetails.contactNumber}
-                  </Typography>
+                  <Typography variant="h6" sx={{ mb: 2 }}>Address Information</Typography>
+                  <Typography><b>House Number:</b> {enrollmentDetails.houseNumber || ''}</Typography>
+                  <Typography><b>Street:</b> {enrollmentDetails.street || ''}</Typography>
+                  <Typography><b>Barangay:</b> {enrollmentDetails.barangay || ''}</Typography>
+                  <Typography><b>City:</b> {enrollmentDetails.city || ''}</Typography>
+                  <Typography><b>Province:</b> {enrollmentDetails.province || ''}</Typography>
+                  <Typography><b>Zip Code:</b> {enrollmentDetails.zipCode || ''}</Typography>
                 </Grid>
-                
-                <Grid item xs={12}>
-                  <Typography variant="subtitle2" color="textSecondary" gutterBottom>
-                    Address
-                  </Typography>
-                  <Typography variant="body1" fontWeight={500}>
-                    {enrollmentDetails.address}
-                  </Typography>
+                {/* Contact Information */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Contact Information</Typography>
+                  <Typography><b>Contact Number:</b> {enrollmentDetails.contactNumber || ''}</Typography>
+                  <Typography><b>Email Address:</b> {enrollmentDetails.user?.email || enrollmentDetails.emailAddress || ''}</Typography>
+                </Grid>
+                {/* Previous School Information */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Previous School Information</Typography>
+                  <Typography><b>Last School Attended:</b> {enrollmentDetails.lastSchoolAttended || ''}</Typography>
+                  <Typography><b>School Address:</b> {enrollmentDetails.schoolAddress || ''}</Typography>
+                  <Typography><b>Grade Level:</b> {enrollmentDetails.gradeLevel || ''}</Typography>
+                  <Typography><b>School Year:</b> {enrollmentDetails.schoolYear || ''}</Typography>
+                </Grid>
+                {/* Parent/Guardian Information */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Parent/Guardian Information</Typography>
+                  <Typography><b>Father's Name:</b> {enrollmentDetails.fatherName || ''}</Typography>
+                  <Typography><b>Father's Occupation:</b> {enrollmentDetails.fatherOccupation || ''}</Typography>
+                  <Typography><b>Father's Contact Number:</b> {enrollmentDetails.fatherContactNumber || ''}</Typography>
+                  <Typography><b>Mother's Name:</b> {enrollmentDetails.motherName || ''}</Typography>
+                  <Typography><b>Mother's Occupation:</b> {enrollmentDetails.motherOccupation || ''}</Typography>
+                  <Typography><b>Mother's Contact Number:</b> {enrollmentDetails.motherContactNumber || ''}</Typography>
+                  <Typography><b>Guardian's Name:</b> {enrollmentDetails.guardianName || ''}</Typography>
+                  <Typography><b>Guardian's Relationship:</b> {enrollmentDetails.guardianRelationship || ''}</Typography>
+                  <Typography><b>Guardian's Occupation:</b> {enrollmentDetails.guardianOccupation || ''}</Typography>
+                  <Typography><b>Guardian's Contact Number:</b> {enrollmentDetails.guardianContactNumber || ''}</Typography>
+                </Grid>
+                {/* Emergency Contact */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Emergency Contact</Typography>
+                  <Typography><b>Name:</b> {enrollmentDetails.emergencyContactName || ''}</Typography>
+                  <Typography><b>Relationship:</b> {enrollmentDetails.emergencyContactRelationship || ''}</Typography>
+                  <Typography><b>Contact Number:</b> {enrollmentDetails.emergencyContactNumber || ''}</Typography>
+                  <Typography><b>Address:</b> {enrollmentDetails.emergencyContactAddress || ''}</Typography>
+                </Grid>
+                {/* Enrollment Details */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Enrollment Details</Typography>
+                  <Typography><b>Enrollment Type:</b> {enrollmentDetails.enrollmentType || ''}</Typography>
+                  <Typography><b>Grade to Enroll:</b> {enrollmentDetails.gradeToEnroll || ''}</Typography>
+                  <Typography><b>Track:</b> {enrollmentDetails.track || ''}</Typography>
+                  <Typography><b>Section:</b> {enrollmentDetails.section || ''}</Typography>
+                  <Typography><b>Status:</b> {enrollmentDetails.status || ''}</Typography>
+                  <Typography><b>Application Date:</b> {enrollmentDetails.createdAt ? new Date(enrollmentDetails.createdAt).toLocaleDateString() : ''}</Typography>
+                </Grid>
+                {/* Documents */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Documents</Typography>
+                  <Typography><b>Form 137:</b> {enrollmentDetails.form137 ? 'Submitted' : 'Not Submitted'}</Typography>
+                  <Typography><b>Form 138:</b> {enrollmentDetails.form138 ? 'Submitted' : 'Not Submitted'}</Typography>
+                  <Typography><b>Good Moral:</b> {enrollmentDetails.goodMoral ? 'Submitted' : 'Not Submitted'}</Typography>
+                  <Typography><b>Medical Certificate:</b> {enrollmentDetails.medicalCertificate ? 'Submitted' : 'Not Submitted'}</Typography>
+                  <Typography><b>Parent/Guardian ID:</b> {enrollmentDetails.parentId ? 'Submitted' : 'Not Submitted'}</Typography>
+                  <Typography><b>ID Pictures:</b> {enrollmentDetails.idPictures ? 'Submitted' : 'Not Submitted'}</Typography>
+                </Grid>
+                {/* Additional Information */}
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Additional Information</Typography>
+                  <Typography><b>Special Needs:</b> {enrollmentDetails.specialNeeds || ''}</Typography>
+                  <Typography><b>Allergies:</b> {enrollmentDetails.allergies || ''}</Typography>
+                  <Typography><b>Medications:</b> {enrollmentDetails.medications || ''}</Typography>
                 </Grid>
               </Grid>
             )}
