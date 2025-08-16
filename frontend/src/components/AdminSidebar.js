@@ -145,11 +145,11 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
   const getRoleDisplayName = (role) => {
     switch (role) {
       case 'super-admin':
-        return 'Super Administrator';
+        return 'Super Admin';
       case 'admin-document':
-        return 'Document Administrator';
+        return 'Document Admin';
       case 'admin-enrollment':
-        return 'Enrollment Administrator';
+        return 'Enrollment Admin';
       case 'admin':
         return 'Administrator';
       default:

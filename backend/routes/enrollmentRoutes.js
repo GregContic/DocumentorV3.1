@@ -10,6 +10,50 @@ router.get('/my-status', authenticate, enrollmentController.getMyEnrollmentStatu
 // Admin: Get all enrollments
 router.get('/admin', authenticate, authorizeAdmin, enrollmentController.getAllEnrollments);
 
+// Test endpoint to verify grade filtering is working (no auth for testing)
+router.get('/test-grade-filter', async (req, res) => {
+  const { section, gradeLevel } = req.query;
+  console.log('[TEST] section:', section, 'gradeLevel:', gradeLevel);
+  
+  // Test the actual filtering logic
+  const Enrollment = require('../models/Enrollment');
+  const raw = (section || '').trim();
+  const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const exactRegex = new RegExp(`^\\s*${escaped}\\s*$`, 'i');
+  
+  const query = {
+    section: { $regex: exactRegex }
+  };
+  
+  if (gradeLevel) {
+    const gradeVariants = [];
+    const cleanGrade = gradeLevel.replace(/^grade\s*/i, '').trim();
+    gradeVariants.push(cleanGrade);
+    gradeVariants.push(`Grade ${cleanGrade}`);
+    gradeVariants.push(gradeLevel);
+    
+    query.$or = gradeVariants.map(variant => ({ gradeToEnroll: variant }));
+    console.log('[TEST] Grade variants:', gradeVariants);
+  }
+  
+  const enrollments = await Enrollment.find(query).lean();
+  console.log('[TEST] Found', enrollments.length, 'enrollments');
+  
+  res.json({ 
+    section, 
+    gradeLevel, 
+    query, 
+    found: enrollments.length,
+    enrollments: enrollments.map(e => ({
+      firstName: e.firstName,
+      surname: e.surname,
+      section: e.section,
+      gradeToEnroll: e.gradeToEnroll,
+      status: e.status
+    }))
+  });
+});
+
 // Admin: Get enrollments by section name
 router.get('/by-section', authenticate, authorizeAdmin, enrollmentController.getEnrollmentsBySection);
 

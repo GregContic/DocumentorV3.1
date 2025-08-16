@@ -8,4 +8,7 @@ const SectionSchema = new mongoose.Schema({
   createdAt: { type: Date, default: Date.now }
 });
 
+// Create compound index to ensure unique section name per grade level
+SectionSchema.index({ name: 1, gradeLevel: 1 }, { unique: true });
+
 module.exports = mongoose.model('Section', SectionSchema);

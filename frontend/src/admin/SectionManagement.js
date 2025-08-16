@@ -47,17 +47,46 @@ const SectionManagement = () => {
     setEnrolledStudents([]);
     try {
       const token = localStorage.getItem('token');
-      // Fetch all enrollments for this section, regardless of status
-      const res = await fetch(`http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(section.name)}`, {
+      // Use the exact section name and gradeLevel as stored
+      let sectionName = section.name ? section.name.trim() : '';
+      let gradeLevel = section.gradeLevel || '';
+      
+      console.log('[ManageSection] Original section data:', section);
+      console.log('[ManageSection] Using sectionName:', sectionName, 'gradeLevel:', gradeLevel);
+      
+      // Fetch all enrollments for this section with grade level filtering
+      const url = `http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(sectionName)}&gradeLevel=${encodeURIComponent(gradeLevel)}`;
+      console.log('[ManageSection] Fetching URL:', url);
+      
+      const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
+        console.log('[ManageSection] Fetched students for section:', sectionName, 'count:', data.length);
+        data.forEach((student, index) => {
+          console.log(`[ManageSection] Student ${index}:`, {
+            _id: student._id,
+            firstName: student.firstName,
+            surname: student.surname,
+            section: student.section,
+            gradeToEnroll: student.gradeToEnroll,
+            status: student.status,
+            sex: student.sex,
+            user: student.user
+          });
+        });
         setEnrolledStudents(Array.isArray(data) ? data : []);
       } else {
+        // Read server error text for debugging
+        const text = await res.text();
+        console.error('[ManageSection] API error', res.status, text);
+        setError(`Failed to load students for section (status ${res.status}).`);
         setEnrolledStudents([]);
       }
     } catch (err) {
+      console.error('[ManageSection] Error:', err);
+      setError('Failed to load students for section.');
       setEnrolledStudents([]);
     } finally {
       setStudentsLoading(false);
@@ -87,17 +116,30 @@ const SectionManagement = () => {
     const counts = {};
     await Promise.all(sections.map(async (section) => {
       try {
-        // Fetch all enrollments for this section, regardless of status
-        const res = await fetch(`http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(section.name)}`, {
+        // Use the exact section name and gradeLevel as stored
+        let sectionName = section.name ? section.name.trim() : '';
+        let gradeLevel = section.gradeLevel || '';
+        
+        console.log('[SectionCounts] Checking section:', sectionName, 'grade:', gradeLevel);
+        
+        // Fetch all enrollments for this section with grade level filtering
+        const url = `http://localhost:5000/api/enrollments/by-section?section=${encodeURIComponent(sectionName)}&gradeLevel=${encodeURIComponent(gradeLevel)}`;
+        const res = await fetch(url, {
           headers: { 'Authorization': `Bearer ${token}` }
         });
         if (res.ok) {
           const data = await res.json();
-          counts[section._id] = Array.isArray(data) ? data.length : 0;
+          // Only count students with status 'enrolled'
+          const enrolledCount = Array.isArray(data) ? data.filter(e => e.status === 'enrolled').length : 0;
+          counts[section._id] = enrolledCount;
+          console.log('[SectionCounts] Section', sectionName, 'has', enrolledCount, 'enrolled students');
         } else {
+          const text = await res.text();
+          console.error('[SectionCounts] API error for section', sectionName, res.status, text);
           counts[section._id] = 0;
         }
-      } catch {
+      } catch (err) {
+        console.error('[SectionCounts] Error for section', section.name, err);
         counts[section._id] = 0;
       }
     }));
@@ -238,17 +280,31 @@ const SectionManagement = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'male').length === 0 ? (
-                        <TableRow><TableCell colSpan={3}>No male students.</TableCell></TableRow>
-                      ) : (
-                        enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'male').map(student => (
+                      {(() => {
+                        // Show all students with 'enrolled' status and male gender
+                        const maleEnrolled = enrolledStudents.filter(s => 
+                          s.status === 'enrolled' && 
+                          (s.sex || '').toLowerCase() === 'male'
+                        );
+                        console.log('[ManageSection Modal] Male students found:', maleEnrolled.length);
+                        
+                        if (maleEnrolled.length === 0) {
+                          return <TableRow><TableCell colSpan={3}>No male students enrolled.</TableCell></TableRow>;
+                        }
+                        return maleEnrolled.map(student => (
                           <TableRow key={student._id}>
-                            <TableCell>{student.firstName} {student.surname}</TableCell>
+                            <TableCell>{
+                              (student.firstName || student.surname)
+                                ? `${student.firstName || ''} ${student.surname || ''}`.trim()
+                                : student.user
+                                  ? `${student.user.firstName || ''} ${student.user.lastName || ''}`.trim()
+                                  : 'N/A'
+                            }</TableCell>
                             <TableCell>{student.user?.email || student.emailAddress}</TableCell>
                             <TableCell>{student.status}</TableCell>
                           </TableRow>
-                        ))
-                      )}
+                        ));
+                      })()}
                     </TableBody>
                   </Table>
                 </Grid>
@@ -263,17 +319,62 @@ const SectionManagement = () => {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'female').length === 0 ? (
-                        <TableRow><TableCell colSpan={3}>No female students.</TableCell></TableRow>
-                      ) : (
-                        enrolledStudents.filter(s => (s.sex || '').toLowerCase() === 'female').map(student => (
+                      {(() => {
+                        // Show all students with 'enrolled' status and female gender
+                        const femaleEnrolled = enrolledStudents.filter(s => 
+                          s.status === 'enrolled' && 
+                          (s.sex || '').toLowerCase() === 'female'
+                        );
+                        console.log('[ManageSection Modal] Female students found:', femaleEnrolled.length);
+                        
+                        if (femaleEnrolled.length === 0) {
+                          return <TableRow><TableCell colSpan={3}>No female students enrolled.</TableCell></TableRow>;
+                        }
+                        return femaleEnrolled.map(student => (
                           <TableRow key={student._id}>
-                            <TableCell>{student.firstName} {student.surname}</TableCell>
+                            <TableCell>{
+                              (student.firstName || student.surname)
+                                ? `${student.firstName || ''} ${student.surname || ''}`.trim()
+                                : student.user
+                                  ? `${student.user.firstName || ''} ${student.user.lastName || ''}`.trim()
+                                  : 'N/A'
+                            }</TableCell>
                             <TableCell>{student.user?.email || student.emailAddress}</TableCell>
                             <TableCell>{student.status}</TableCell>
                           </TableRow>
-                        ))
-                      )}
+                        ));
+                      })()}
+                    </TableBody>
+                  </Table>
+                </Grid>
+                
+                {/* Debug section - show all students for troubleshooting */}
+                <Grid item xs={12}>
+                  <Typography variant="subtitle2" sx={{ mb: 1, mt: 2 }}>
+                    All Students in Section (Debug Info)
+                  </Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Name</TableCell>
+                        <TableCell>Gender</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Section</TableCell>
+                        <TableCell>Grade</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {enrolledStudents.map((student, index) => (
+                        <TableRow key={student._id || index}>
+                          <TableCell>
+                            {`${student.firstName || ''} ${student.surname || ''}`.trim() || 'N/A'}
+                          </TableCell>
+                          <TableCell>{student.sex || 'Not specified'}</TableCell>
+                          <TableCell>{student.status}</TableCell>
+                          <TableCell>{student.section}</TableCell>
+                          <TableCell>{student.gradeToEnroll}</TableCell>
+                        </TableRow>
+                      ))}
                     </TableBody>
                   </Table>
                 </Grid>

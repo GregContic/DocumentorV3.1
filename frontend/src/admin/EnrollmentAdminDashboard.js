@@ -149,30 +149,39 @@ const EnrollmentAdminDashboard = () => {
     setSectionFetchError('');
     try {
       const token = localStorage.getItem('token');
-  let gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel;
-  // Guarantee match for Grade 11 and Grade 12
-  if (gradeLevel === '11') gradeLevel = 'Grade 11';
-  if (gradeLevel === '12') gradeLevel = 'Grade 12';
-  console.log('[AssignSection] gradeLevel sent to backend:', gradeLevel);
-  const url = `http://localhost:5000/api/sections/grade/${encodeURIComponent(gradeLevel)}`;
+      let gradeLevel = enrollment.gradeToEnroll || enrollment.gradeLevel;
+      
+      console.log('[AssignSection] Original gradeLevel from enrollment:', gradeLevel);
+      
+      // Normalize gradeLevel - if it's just a number, add "Grade " prefix
+      if (/^[7-9]$|^10$|^11$|^12$/.test(gradeLevel)) {
+        gradeLevel = `Grade ${gradeLevel}`;
+      }
+      
+      console.log('[AssignSection] Normalized gradeLevel sent to backend:', gradeLevel);
+      console.log('[AssignSection] Full enrollment object:', enrollment);
+      
+      const url = `http://localhost:5000/api/sections/grade/${encodeURIComponent(gradeLevel)}`;
+      console.log('[AssignSection] Fetching sections from URL:', url);
+      
       const res = await fetch(url, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        console.log('[AssignSection] sections response from backend:', data);
+        console.log('[AssignSection] Sections response from backend:', data);
         setAvailableSections(Array.isArray(data) ? data : []);
         if (!data.length) {
-          setSectionFetchError('No sections currently created for this grade. Create one on the Manage Sections page.');
+          setSectionFetchError(`No sections found for ${gradeLevel}. Create sections in the Section Management page first.`);
         }
       } else {
-        setSectionFetchError('Failed to fetch sections.');
         const errorText = await res.text();
-        console.error('[AssignSection] Backend error:', errorText);
+        console.error('[AssignSection] Backend error:', res.status, errorText);
+        setSectionFetchError(`Failed to fetch sections (status ${res.status}). Check console for details.`);
       }
     } catch (err) {
-      setSectionFetchError('Failed to fetch sections.');
       console.error('[AssignSection] Fetch error:', err);
+      setSectionFetchError('Network error while fetching sections.');
     }
   };
 
@@ -192,6 +201,11 @@ const EnrollmentAdminDashboard = () => {
       // Always use the exact, trimmed section name for assignment
       const selectedSectionObj = availableSections.find(s => s._id === selectedSectionId);
       const sectionName = selectedSectionObj && selectedSectionObj.name ? selectedSectionObj.name.trim() : '';
+      
+      console.log('[AssignSection] Assigning student to section:', sectionName);
+      console.log('[AssignSection] Selected section object:', selectedSectionObj);
+      console.log('[AssignSection] Enrollment ID:', selectedEnrollmentForSection._id);
+      
       const res = await fetch(`http://localhost:5000/api/enrollments/${selectedEnrollmentForSection._id}/status`, {
         method: 'PUT',
         headers: {
@@ -204,16 +218,22 @@ const EnrollmentAdminDashboard = () => {
           reviewNotes: `Assigned to section ${sectionName}`,
         }),
       });
+      
       if (res.ok) {
+        const result = await res.json();
+        console.log('[AssignSection] Assignment successful:', result);
         setSuccessMessage('Section assigned successfully!');
         setShowSuccessMessage(true);
         fetchEnrollments();
         handleCloseAssignDialog();
       } else {
-        setError('Failed to assign section.');
+        const errorText = await res.text();
+        console.error('[AssignSection] Assignment failed:', res.status, errorText);
+        setError(`Failed to assign section (status ${res.status}). Check console for details.`);
       }
     } catch (err) {
-      setError('Failed to assign section.');
+      console.error('[AssignSection] Assignment error:', err);
+      setError('Network error while assigning section.');
     } finally {
       setAssigning(false);
     }
@@ -1042,7 +1062,7 @@ const EnrollmentAdminDashboard = () => {
                   </TableBody>
                 </Table>
                 <TablePagination
-                  rowsPerPageOptions={[5, 10, 25]}
+                  rowsPerPageOptions={[5, 10, 25, 50, 100, 200]}
                   component="div"
                   count={filteredEnrollments.length}
                   rowsPerPage={rowsPerPage}

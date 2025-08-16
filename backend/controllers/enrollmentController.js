@@ -2,14 +2,61 @@
 exports.getEnrollmentsBySection = async (req, res) => {
   try {
     const sectionName = req.query.section;
+    const gradeLevel = req.query.gradeLevel; // Add grade level filtering
     if (!sectionName) {
       return res.status(400).json({ message: 'Section name is required' });
     }
-    const enrollments = await Enrollment.find({ section: sectionName })
+    
+    // Log incoming query (for debug) and build a precise, case-insensitive regex
+    console.log('[ENROLLMENTS BY SECTION] query section:', sectionName, 'gradeLevel:', gradeLevel);
+    
+    // Properly escape any regex metacharacters in the section name
+    const raw = sectionName.trim();
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    // Match only the exact section name (case-insensitive, trimmed)
+    const exactRegex = new RegExp(`^\\s*${escaped}\\s*$`, 'i');
+    
+    // Build query with section matching
+    const query = {
+      section: { $regex: exactRegex }
+    };
+    
+    // Add grade level filtering if provided
+    if (gradeLevel) {
+      // Handle both "Grade 7" and "7" formats for gradeToEnroll
+      const gradeVariants = [];
+      const cleanGrade = gradeLevel.replace(/^grade\s*/i, '').trim();
+      gradeVariants.push(cleanGrade); // "7", "8", etc.
+      gradeVariants.push(`Grade ${cleanGrade}`); // "Grade 7", "Grade 8", etc.
+      gradeVariants.push(gradeLevel); // Original format
+      
+      query.gradeToEnroll = {
+        $in: gradeVariants.map(variant => new RegExp(`^\\s*${variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'))
+      };
+      
+      console.log('[ENROLLMENTS BY SECTION] filtering by grade variants:', gradeVariants);
+    }
+    
+    console.log('[ENROLLMENTS BY SECTION] final query:', JSON.stringify(query, null, 2));
+    
+    const enrollments = await Enrollment.find(query)
       .populate('user', 'firstName lastName email')
       .sort({ createdAt: -1 });
+
+    console.log('[ENROLLMENTS BY SECTION] found:', Array.isArray(enrollments) ? enrollments.length : 0);
+    // Log brief summary for each matched enrollment to aid debugging
+    if (Array.isArray(enrollments)) {
+      enrollments.forEach(e => console.log('[ENROLLMENTS BY SECTION] match:', { 
+        id: e._id, 
+        name: `${e.firstName} ${e.surname}`,
+        section: e.section, 
+        grade: e.gradeToEnroll,
+        status: e.status 
+      }));
+    }
     res.json(enrollments);
   } catch (error) {
+    console.error('[ENROLLMENTS BY SECTION] error:', error);
     res.status(500).json({ message: 'Failed to fetch enrollments for section', error: error.message });
   }
 };
@@ -159,6 +206,7 @@ exports.updateEnrollmentStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status, reviewNotes, rejectionReason, section } = req.body;
+  console.log('[ENROLLMENT UPDATE] id:', id, 'payload:', req.body, 'by user:', req.user ? req.user.userId : 'no-user');
 
     const updateData = {
       status,
@@ -184,6 +232,7 @@ exports.updateEnrollmentStatus = async (req, res) => {
     const enrollment = await Enrollment.findByIdAndUpdate(id, updateData, { new: true })
       .populate('user', 'firstName lastName email')
       .populate('reviewedBy', 'firstName lastName');
+  console.log('[ENROLLMENT UPDATE] updated enrollment:', enrollment ? { _id: enrollment._id, status: enrollment.status, section: enrollment.section } : 'NOT_FOUND');
     
     if (!enrollment) {
       return res.status(404).json({ message: 'Enrollment not found' });
