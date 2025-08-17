@@ -41,6 +41,7 @@ const EnrollmentStatus = () => {
   const [enrollmentData, setEnrollmentData] = useState(null);
   const [hasEnrollment, setHasEnrollment] = useState(false);
   const [error, setError] = useState('');
+  const [adviser, setAdviser] = useState('');
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
 
@@ -59,12 +60,44 @@ const EnrollmentStatus = () => {
       setHasEnrollment(response.data.hasEnrollment);
       if (response.data.hasEnrollment) {
         setEnrollmentData(response.data.enrollment);
+        // If enrolled and has section, fetch adviser
+        if (response.data.enrollment.status === 'enrolled' && response.data.enrollment.section) {
+          fetchSectionAdviser(response.data.enrollment.section, response.data.enrollment.gradeToEnroll);
+        } else {
+          setAdviser('');
+        }
       }
     } catch (error) {
       console.error('Error fetching enrollment status:', error);
       setError('Failed to load enrollment status. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Fetch adviser for the assigned section
+  const fetchSectionAdviser = async (sectionName, gradeToEnroll) => {
+    try {
+      // Always use the "Grade X" format for gradeLevel
+      let gradeLevel = gradeToEnroll;
+      if (!/^Grade /.test(gradeLevel)) {
+        gradeLevel = `Grade ${gradeLevel}`;
+      }
+      const token = localStorage.getItem('token');
+      const res = await fetch(
+        `http://localhost:5000/api/sections/grade/${encodeURIComponent(gradeLevel)}`,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        // Find the section with the matching name
+        const found = data.find(s => s.name.trim() === sectionName.trim());
+        setAdviser(found && found.adviser ? found.adviser : '');
+      } else {
+        setAdviser('');
+      }
+    } catch {
+      setAdviser('');
     }
   };
 
@@ -297,9 +330,16 @@ const EnrollmentStatus = () => {
                 Welcome! You are now officially enrolled. Check your school email for class schedules and other important information.
               </Typography>
               {enrollmentData.section && (
-                <Typography variant="body2" sx={{ mt: 2 }}>
-                  <strong>Assigned Section:</strong> {enrollmentData.section}
-                </Typography>
+                <>
+                  <Typography variant="body2" sx={{ mt: 2 }}>
+                    <strong>Assigned Section:</strong> {enrollmentData.section}
+                  </Typography>
+                  {adviser && (
+                    <Typography variant="body2" sx={{ mt: 1 }}>
+                      <strong>Adviser:</strong> {adviser}
+                    </Typography>
+                  )}
+                </>
               )}
             </Alert>
           )}
