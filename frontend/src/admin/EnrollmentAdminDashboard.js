@@ -461,6 +461,46 @@ const EnrollmentAdminDashboard = () => {
     return matchesSearch && matchesStatus && matchesGrade;
   });
 
+  // Helper to calculate age from date of birth (for modal display)
+  function calculateAgeFromDOB(dobStr) {
+    if (!dobStr) return '';
+    const dob = new Date(dobStr);
+    if (isNaN(dob.getTime())) return '';
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const m = today.getMonth() - dob.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
+  }
+
+  // Helper to format date as YYYY-MM-DD
+  function formatDateYMD(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toISOString().slice(0, 10);
+  }
+
+  // Helper to display track based on grade level
+  function getTrackDisplay(gradeLevel, track) {
+    if (!gradeLevel) return track || '';
+    
+    // Extract grade number from grade level string
+    const gradeMatch = gradeLevel.toString().match(/\d+/);
+    if (!gradeMatch) return track || '';
+    
+    const gradeNumber = parseInt(gradeMatch[0]);
+    
+    // Grades 7-10 are trackless, so show "non-applicable"
+    if (gradeNumber >= 7 && gradeNumber <= 10) {
+      return 'non-applicable';
+    }
+    
+    // Grades 11-12 should show the actual track
+    return track || '';
+  }
   return (
     <AdminLayout title="Enrollment Management Dashboard">
       <Container maxWidth="xl">
@@ -470,7 +510,6 @@ const EnrollmentAdminDashboard = () => {
           p: 4,
           background: 'linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.7) 100%)',
           backdropFilter: 'blur(20px)',
-          borderRadius: 4,
           border: '1px solid rgba(255,255,255,0.3)',
           boxShadow: '0 12px 40px rgba(0,0,0,0.1)',
           position: 'relative',
@@ -1130,10 +1169,10 @@ const EnrollmentAdminDashboard = () => {
                   <Typography><b>First Name:</b> {enrollmentDetails.firstName || ''}</Typography>
                   <Typography><b>Middle Name:</b> {enrollmentDetails.middleName || ''}</Typography>
                   <Typography><b>Extension:</b> {enrollmentDetails.extension || ''}</Typography>
-                  <Typography><b>Date of Birth:</b> {enrollmentDetails.dateOfBirth || ''}</Typography>
+                  <Typography><b>Date of Birth:</b> {formatDateYMD(enrollmentDetails.dateOfBirth)}</Typography>
                   <Typography><b>Place of Birth:</b> {enrollmentDetails.placeOfBirth || ''}</Typography>
                   <Typography><b>Sex:</b> {enrollmentDetails.sex || ''}</Typography>
-                  <Typography><b>Age:</b> {enrollmentDetails.age || ''}</Typography>
+                  <Typography><b>Age:</b> {calculateAgeFromDOB(enrollmentDetails.dateOfBirth)}</Typography>
                   <Typography><b>Religion:</b> {enrollmentDetails.religion || ''}</Typography>
                   <Typography><b>Citizenship:</b> {enrollmentDetails.citizenship || ''}</Typography>
                 </Grid>
@@ -1188,7 +1227,7 @@ const EnrollmentAdminDashboard = () => {
                   <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Enrollment Details</Typography>
                   <Typography><b>Enrollment Type:</b> {enrollmentDetails.enrollmentType || ''}</Typography>
                   <Typography><b>Grade to Enroll:</b> {enrollmentDetails.gradeToEnroll || ''}</Typography>
-                  <Typography><b>Track:</b> {enrollmentDetails.track || ''}</Typography>
+                  <Typography><b>Track:</b> {getTrackDisplay(enrollmentDetails.gradeToEnroll || enrollmentDetails.gradeLevel, enrollmentDetails.track)}</Typography>
                   <Typography><b>Section:</b> {enrollmentDetails.section || ''}</Typography>
                   <Typography><b>Status:</b> {enrollmentDetails.status || ''}</Typography>
                   <Typography><b>Application Date:</b> {enrollmentDetails.createdAt ? new Date(enrollmentDetails.createdAt).toLocaleDateString() : ''}</Typography>
@@ -1196,12 +1235,72 @@ const EnrollmentAdminDashboard = () => {
                 {/* Documents */}
                 <Grid item xs={12} md={6}>
                   <Typography variant="h6" sx={{ mb: 2, mt: 3 }}>Documents</Typography>
-                  <Typography><b>Form 137:</b> {enrollmentDetails.form137 ? 'Submitted' : 'Not Submitted'}</Typography>
-                  <Typography><b>Form 138:</b> {enrollmentDetails.form138 ? 'Submitted' : 'Not Submitted'}</Typography>
-                  <Typography><b>Good Moral:</b> {enrollmentDetails.goodMoral ? 'Submitted' : 'Not Submitted'}</Typography>
-                  <Typography><b>Medical Certificate:</b> {enrollmentDetails.medicalCertificate ? 'Submitted' : 'Not Submitted'}</Typography>
-                  <Typography><b>Parent/Guardian ID:</b> {enrollmentDetails.parentId ? 'Submitted' : 'Not Submitted'}</Typography>
-                  <Typography><b>ID Pictures:</b> {enrollmentDetails.idPictures ? 'Submitted' : 'Not Submitted'}</Typography>
+                  {/* Form 137 */}
+                  <Typography>
+                    <b>Form 137:</b> {enrollmentDetails.form137File ? (
+                      (() => {
+                        const fileName = enrollmentDetails.form137File.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
+                  {/* Form 138 */}
+                  <Typography>
+                    <b>Form 138:</b> {enrollmentDetails.form138File ? (
+                      (() => {
+                        const fileName = enrollmentDetails.form138File.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
+                  {/* Good Moral */}
+                  <Typography>
+                    <b>Good Moral:</b> {enrollmentDetails.goodMoralFile ? (
+                      (() => {
+                        const fileName = enrollmentDetails.goodMoralFile.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
+                  {/* Medical Certificate */}
+                  <Typography>
+                    <b>Medical Certificate:</b> {enrollmentDetails.medicalCertificateFile ? (
+                      (() => {
+                        const fileName = enrollmentDetails.medicalCertificateFile.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
+                  {/* Parent/Guardian ID */}
+                  <Typography>
+                    <b>Parent/Guardian ID:</b> {enrollmentDetails.parentIdFile ? (
+                      (() => {
+                        const fileName = enrollmentDetails.parentIdFile.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
+                  {/* ID Pictures */}
+                  <Typography>
+                    <b>ID Pictures:</b> {enrollmentDetails.idPicturesFile ? (
+                      (() => {
+                        const fileName = enrollmentDetails.idPicturesFile.split(/[/\\]/).pop();
+                        return (
+                          <a href={`http://localhost:5000/uploads/enrollments/${fileName}`} target="_blank" rel="noopener noreferrer">View</a>
+                        );
+                      })()
+                    ) : 'Not Submitted'}
+                  </Typography>
                 </Grid>
                 {/* Additional Information */}
                 <Grid item xs={12} md={6}>

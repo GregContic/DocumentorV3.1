@@ -357,10 +357,9 @@ const SectionManagement = () => {
                     <TableHead>
                       <TableRow>
                         <TableCell>Name</TableCell>
+                        <TableCell>Email</TableCell>
                         <TableCell>Gender</TableCell>
                         <TableCell>Status</TableCell>
-                        <TableCell>Section</TableCell>
-                        <TableCell>Grade</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -369,10 +368,9 @@ const SectionManagement = () => {
                           <TableCell>
                             {`${student.firstName || ''} ${student.surname || ''}`.trim() || 'N/A'}
                           </TableCell>
+                          <TableCell>{student.user?.email || student.emailAddress || 'N/A'}</TableCell>
                           <TableCell>{student.sex || 'Not specified'}</TableCell>
                           <TableCell>{student.status}</TableCell>
-                          <TableCell>{student.section}</TableCell>
-                          <TableCell>{student.gradeToEnroll}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

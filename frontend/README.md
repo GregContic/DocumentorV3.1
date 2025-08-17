@@ -1,70 +1,103 @@
-# Getting Started with Create React App
+# ELTNHS Online Enrollment Portal (Frontend)
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A modern, glassmorphic web application for Eastern La Trinidad National High School's online enrollment and document management. Built with React and Material-UI, this portal provides a seamless, secure, and user-friendly experience for students, parents, and administrators.
 
-## Available Scripts
+---
 
-In the project directory, you can run:
+## 🚀 Features
+- **Digital Document Requests**: Request, track, and receive academic documents online.
+- **Online Enrollment**: Complete enrollment applications for Grades 7-12 with AI-powered validation.
+- **Admin Dashboard**: Manage users, documents, and enrollment with role-based access.
+- **Real-Time Notifications**: Get instant updates on request status.
+- **Bank-Level Security**: Secure authentication and data handling.
+- **Cloud Integration**: Access your data anywhere, anytime.
+- **Responsive Design**: Works on desktop, tablet, and mobile.
 
-### `npm start`
+## 🛠️ Tech Stack
+- **React** (Create React App)
+- **Material-UI (MUI)** for UI components and styling
+- **React Router** for navigation
+- **Context API** for authentication and global state
+- **Custom Hooks** for notifications and logic
+- **Jest/React Testing Library** for tests
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## 📁 Folder Structure
+```
+frontend/
+├── public/                # Static assets (favicon, manifest, etc.)
+├── src/
+│   ├── assets/            # Images and static resources (e.g., easternestetik.png)
+│   ├── components/        # Reusable UI components (Navbar, Sidebar, Layout, etc.)
+│   ├── context/           # React Contexts (AuthContext, etc.)
+│   ├── hooks/             # Custom React hooks
+│   ├── pages/             # Page components (public, admin, user, etc.)
+│   ├── utils/             # Utility functions and helpers
+│   ├── App.js             # Main app component
+│   └── index.js           # Entry point
+├── package.json           # Project metadata and dependencies
+└── README.md              # This file
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## 🖼️ Customization
+- **Hero Image**: The main hero image is located at `src/assets/easternestetik.png`. Replace this file to update the homepage photo.
+- **Branding**: Update colors, logos, and text in `src/components` and `src/pages/public/Home.js` as needed.
 
-### `npm test`
+## ⚡ Getting Started
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+### Prerequisites
+- Node.js (v16+ recommended)
+- npm (v8+ recommended)
 
-### `npm run build`
+### Installation
+```bash
+cd frontend
+npm install
+```
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+### Running the App (Development)
+```bash
+npm start
+```
+- Open [http://localhost:3000](http://localhost:3000) in your browser.
+- The app reloads automatically on code changes.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Building for Production
+```bash
+npm run build
+```
+- Output is in the `build/` folder, ready for deployment.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### Running Tests
+```bash
+npm test
+```
+- Runs all tests in watch mode.
 
-### `npm run eject`
+## 🌐 Deployment
+- Deploy the `build/` folder to your preferred static hosting (Vercel, Netlify, GitHub Pages, etc.).
+- For custom domains or HTTPS, follow your host's documentation.
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## 🧩 Environment Variables
+- Create a `.env` file in `frontend/` for custom environment variables (API endpoints, etc.).
+- Example:
+	```env
+	REACT_APP_API_URL=http://localhost:5000/api
+	```
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+## 🛠️ Troubleshooting
+- If you see errors on `npm start`, ensure Node and npm are up to date.
+- If images do not load, check the path in `src/pages/public/Home.js` and that the file exists in `src/assets/`.
+- For CORS/API issues, verify your backend server allows requests from `localhost:3000`.
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## 📚 Learn More
+- [React Documentation](https://reactjs.org/)
+- [Material-UI Documentation](https://mui.com/)
+- [Create React App Docs](https://facebook.github.io/create-react-app/docs/getting-started)
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## 👥 Credits
+- Developed for Eastern La Trinidad National High School
+- UI/UX: Glassmorphic design inspired by modern education portals
+- Image credits: School photo property of ELTNHS
 
-## Learn More
-
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
-
-To learn React, check out the [React documentation](https://reactjs.org/).
-
-### Code Splitting
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## 📝 License
+This project is for educational and internal school use. For external use or redistribution, please contact the school administration.

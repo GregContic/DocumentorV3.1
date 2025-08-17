@@ -142,14 +142,15 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
     return location.pathname === path;
   };
 
+  // Remove Enrollment Admin display name from sidebar
   const getRoleDisplayName = (role) => {
     switch (role) {
       case 'super-admin':
         return 'Super Admin';
       case 'admin-document':
         return 'Document Admin';
-      case 'admin-enrollment':
-        return 'Enrollment Admin';
+      // case 'admin-enrollment':
+      //   return 'Enrollment Admin';
       case 'admin':
         return 'Administrator';
       default:
@@ -214,16 +215,19 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
                <DocumentIcon sx={{ color: 'white', fontSize: 24 }} />}
             </Box>
             <Box>
-              <Typography variant="h6" noWrap component="div" sx={{ 
-                fontWeight: 700,
-                background: 'linear-gradient(45deg, #FFF 30%, #E3F2FD 90%)',
-                backgroundClip: 'text',
-                textFillColor: 'transparent',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent'
-              }}>
-                {getRoleDisplayName(user?.role)}
-              </Typography>
+              {/* Removed Enrollment Admin display name, only show for other roles */}
+              {user?.role !== 'admin-enrollment' && (
+                <Typography variant="h6" noWrap component="div" sx={{ 
+                  fontWeight: 700,
+                  background: 'linear-gradient(45deg, #FFF 30%, #E3F2FD 90%)',
+                  backgroundClip: 'text',
+                  textFillColor: 'transparent',
+                  WebkitBackgroundClip: 'text',
+                  WebkitTextFillColor: 'transparent'
+                }}>
+                  {getRoleDisplayName(user?.role)}
+                </Typography>
+              )}
               <Typography variant="caption" sx={{ 
                 color: 'rgba(255,255,255,0.8)',
                 fontWeight: 500
@@ -371,7 +375,8 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
           boxSizing: 'border-box',
           border: 'none',
           boxShadow: '4px 0 24px rgba(0,0,0,0.12)',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          borderRadius: 0
         },
       }}
     >

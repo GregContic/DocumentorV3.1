@@ -291,25 +291,29 @@ const Navbar = () => {
           ) : (
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
               {navItems.map((item) => (
-                <Tooltip key={item.text} title={item.text} arrow>
-                  <Button
-                    onClick={() => navigate(item.path)}
-                    sx={{
-                      color: 'white',
-                      px: 2,
-                      py: 1,
-                      borderRadius: '8px',
-                      '&:hover': {
-                        bgcolor: 'rgba(255, 255, 255, 0.1)',
-                        transform: 'translateY(-1px)'
-                      },
-                      transition: 'all 0.2s ease-in-out'
-                    }}
-                    startIcon={item.icon}
-                  >
-                    {item.text}
-                  </Button>
-                </Tooltip>
+                <Button
+                  key={item.text}
+                  onClick={() => navigate(item.path)}
+                  sx={{
+                    color: 'white',
+                    px: 2,
+                    py: 1,
+                    borderRadius: '8px',
+                    fontWeight: 500,
+                    fontSize: '1rem',
+                    background: user?.role === 'admin' ? 'transparent' : undefined,
+                    boxShadow: 'none',
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.1)',
+                      transform: 'translateY(-1px)'
+                    },
+                    transition: 'all 0.2s ease-in-out'
+                  }}
+                  startIcon={item.icon}
+                  disableElevation
+                >
+                  {item.text}
+                </Button>
               ))}
               
               {/* Notification button for student users only */}

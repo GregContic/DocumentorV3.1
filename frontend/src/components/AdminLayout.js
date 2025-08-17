@@ -65,14 +65,29 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }) => {
           ml: { md: `${drawerWidth}px` },
           zIndex: theme.zIndex.drawer + 1,
           background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+          color: 'white',
           backdropFilter: 'blur(20px)',
           boxShadow: '0 8px 32px rgba(0,0,0,0.12)',
-          border: '1px solid rgba(255,255,255,0.1)',
+          border: 'none',
+          borderRadius: 0,
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'linear-gradient(135deg, rgba(25,118,210,0.9) 0%, rgba(63,81,181,0.9) 100%)',
+            zIndex: 1
+          }
         }}
       >
         <Toolbar sx={{ 
-          background: 'rgba(255,255,255,0.1)', 
-          backdropFilter: 'blur(10px)' 
+          background: 'rgba(255,255,255,0.1)',
+          backdropFilter: 'blur(10px)',
+          borderBottom: '1px solid rgba(255,255,255,0.2)',
+          position: 'relative',
+          zIndex: 2
         }}>
           <IconButton
             color="inherit"
@@ -117,11 +132,10 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }) => {
                 textShadow: '0 1px 2px rgba(0,0,0,0.1)'
               }}
             >
-              Welcome, {user?.firstName || 'Admin'}
             </Typography>
             <IconButton
               size="large"
-              aria-label="account of current user"
+              aria-label="settings"
               aria-controls="menu-appbar"
               aria-haspopup="true"
               onClick={handleMenu}
@@ -136,14 +150,7 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }) => {
                 }
               }}
             >
-              <Avatar sx={{ 
-                width: 32, 
-                height: 32,
-                background: 'linear-gradient(45deg, #FE6B8B 30%, #FF8E53 90%)',
-                fontWeight: 700
-              }}>
-                {user?.firstName?.[0] || 'A'}
-              </Avatar>
+              <SettingsIcon sx={{ fontSize: 28, color: '#fff', textShadow: '0 2px 8px rgba(102,126,234,0.5)' }} />
             </IconButton>
             <Menu
               id="menu-appbar"
@@ -163,7 +170,6 @@ const AdminLayout = ({ children, title = 'Admin Dashboard' }) => {
                 '& .MuiPaper-root': {
                   background: 'rgba(255,255,255,0.95)',
                   backdropFilter: 'blur(20px)',
-                  borderRadius: 3,
                   border: '1px solid rgba(255,255,255,0.2)',
                   boxShadow: '0 12px 40px rgba(0,0,0,0.15)',
                   mt: 1.5

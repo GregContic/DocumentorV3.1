@@ -1,3 +1,4 @@
+import easternestetik from '../../assets/easternestetik.png';
 import React from 'react';
 import {
   Container,
@@ -150,6 +151,9 @@ const Home = () => {
                   p: { xs: 4, md: 6 },
                   boxShadow: '0 24px 48px rgba(0, 0, 0, 0.1)',
                   animation: 'slideInLeft 1s ease-out',
+                  maxWidth: { xs: '100%', md: 650, lg: 800 },
+                  width: { xs: '100%', md: 650, lg: 800 },
+                  ml: { xs: 0, md: -4, lg: -8 },
                   '@keyframes slideInLeft': {
                     '0%': { opacity: 0, transform: 'translateX(-50px)' },
                     '100%': { opacity: 1, transform: 'translateX(0)' },
@@ -313,33 +317,17 @@ const Home = () => {
                   '0%': { opacity: 0, transform: 'translateX(50px)' },
                   '100%': { opacity: 1, transform: 'translateX(0)' },
                 },
+                ml: { xs: 0, md: 8, lg: 12 },
               }}>
                 <Box
                   sx={{
                     position: 'relative',
                     display: 'inline-block',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      top: -20,
-                      left: -20,
-                      right: -20,
-                      bottom: -20,
-                      background: 'linear-gradient(45deg, rgba(255,255,255,0.1), rgba(255,255,255,0.05))',
-                      borderRadius: '50%',
-                      backdropFilter: 'blur(20px)',
-                      border: '1px solid rgba(255,255,255,0.2)',
-                      animation: 'pulse 4s ease-in-out infinite',
-                      '@keyframes pulse': {
-                        '0%, 100%': { transform: 'scale(1)' },
-                        '50%': { transform: 'scale(1.05)' },
-                      },
-                    }
                   }}
                 >
                   <img
-                    src="https://images.unsplash.com/photo-1521737604893-d14cc237f11d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"
-                    alt="Future Education"
+                    src={easternestetik}
+                    alt="Eastern La Trinidad National High School building at sunset"
                     style={{
                       width: '100%',
                       maxWidth: '450px',
