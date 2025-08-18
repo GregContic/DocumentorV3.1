@@ -22,6 +22,7 @@ import {
   CircularProgress
 } from '@mui/material';
 import { Archive as ArchiveIcon, Edit as EditIcon } from '@mui/icons-material';
+import * as XLSX from 'xlsx';
 import { enrollmentService } from '../services/api';
 import AdminLayout from '../components/AdminLayout';
 
@@ -106,6 +107,85 @@ const SectionManagement = () => {
     setManageOpen(false);
     setSelectedSection(null);
     setEnrolledStudents([]);
+  };
+
+  const getNested = (obj, path, alt = '') => {
+    try {
+      return path.split('.').reduce((acc, key) => (acc && acc[key] !== undefined ? acc[key] : undefined), obj) ?? alt;
+    } catch (e) {
+      return alt;
+    }
+  };
+
+  const calculateAge = (dob) => {
+    if (!dob) return '';
+    const birth = new Date(dob);
+    if (isNaN(birth)) return '';
+    const today = new Date();
+    let age = today.getFullYear() - birth.getFullYear();
+    const m = today.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && today.getDate() < birth.getDate())) age--;
+    return age;
+  };
+
+  const handleExportSection = () => {
+    if (!selectedSection) return;
+    const rows = (enrolledStudents || []).map(s => {
+      const dob = getNested(s, 'dateOfBirth', getNested(s, 'dob', ''));
+      return {
+        'Learner Reference Number': getNested(s, 'learnerRefNumber', getNested(s, 'lrn', '')),
+        'Surname': getNested(s, 'surname', getNested(s, 'user.lastName', '')),
+        'First Name': getNested(s, 'firstName', getNested(s, 'user.firstName', '')),
+        'Middle Name': getNested(s, 'middleName', ''),
+        'Extension': getNested(s, 'extension', ''),
+        'Date of Birth': dob ? new Date(dob).toLocaleDateString() : '',
+        'Place of Birth': getNested(s, 'placeOfBirth', ''),
+        'Sex': getNested(s, 'sex', ''),
+        'Age': calculateAge(dob),
+        'Religion': getNested(s, 'religion', ''),
+        'Citizenship': getNested(s, 'citizenship', ''),
+        'House Number': getNested(s, 'houseNumber', ''),
+        'Street': getNested(s, 'street', ''),
+        'Barangay': getNested(s, 'barangay', ''),
+        'City': getNested(s, 'city', ''),
+        'Province': getNested(s, 'province', ''),
+        'Zip Code': getNested(s, 'zipCode', ''),
+        'Contact Number': getNested(s, 'contactNumber', getNested(s, 'user.phone', getNested(s, 'phone', ''))),
+        'Email Address': getNested(s, 'user.email', getNested(s, 'emailAddress', '')),
+        'Last School Attended': getNested(s, 'lastSchoolAttended', ''),
+        'School Address': getNested(s, 'schoolAddress', ''),
+        'Grade Level': getNested(s, 'gradeLevel', getNested(s, 'gradeToEnroll', '')),
+        'School Year': getNested(s, 'schoolYear', ''),
+        'Parent/Guardian Information': getNested(s, 'guardianInfo', ''),
+        "Father's Name": getNested(s, 'fatherName', ''),
+        "Father's Occupation": getNested(s, 'fatherOccupation', ''),
+        "Father's Contact Number": getNested(s, 'fatherContact', ''),
+        "Mother's Name": getNested(s, 'motherName', ''),
+        "Mother's Occupation": getNested(s, 'motherOccupation', ''),
+        "Mother's Contact Number": getNested(s, 'motherContact', ''),
+        'Address': getNested(s, 'address', ''),
+        'Enrollment Type': getNested(s, 'enrollmentType', ''),
+        'Grade to Enroll': getNested(s, 'gradeToEnroll', ''),
+        'Track': getNested(s, 'track', ''),
+        'Section': getNested(s, 'section', ''),
+        'Application Date': getNested(s, 'applicationDate', '') ? new Date(getNested(s, 'applicationDate')).toLocaleString() : ''
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows, { origin: 'A1' });
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+    const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/octet-stream' });
+    const fileName = `${(selectedSection.name || 'section').replace(/[^a-z0-9_-]/ig, '_')}_${(selectedSection.gradeLevel || '').replace(/[^a-z0-9_-]/ig, '_')}_students.xlsx`;
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
 
   const handleArchiveSection = async (section) => {
@@ -526,6 +606,15 @@ const SectionManagement = () => {
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseManage} variant="contained">Close</Button>
+            <Button
+              onClick={handleExportSection}
+              variant="outlined"
+              color="primary"
+              disabled={studentsLoading || (enrolledStudents || []).length === 0}
+              sx={{ textTransform: 'none' }}
+            >
+              Export to Excel
+            </Button>
           </DialogActions>
         </Dialog>
 
