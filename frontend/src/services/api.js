@@ -105,6 +105,12 @@ export const enrollmentService = {
   },
   getMyEnrollmentStatus: () => api.get('/api/enrollments/my-status'),
   getAllEnrollments: () => api.get('/api/enrollments/admin'),
+  getArchivedEnrollments: () => api.get('/api/enrollments/admin/archived'),
+  archiveEnrollment: (id) => api.put(`/api/enrollments/${id}/archive`),
+  restoreEnrollment: (id) => api.put(`/api/enrollments/${id}/restore`),
+  bulkArchiveCompletedEnrollments: () => api.post('/api/enrollments/admin/bulk-archive'),
+  archiveStudentsBySection: (sectionName, gradeLevel) => 
+    api.post('/api/enrollments/admin/archive-by-section', { sectionName, gradeLevel }),
   updateEnrollmentStatus: (id, statusData) => api.put(`/api/enrollments/${id}/status`, statusData),
   getSectionsByGrade: (gradeLevel) => api.get(`/api/enrollments/sections?gradeLevel=${encodeURIComponent(gradeLevel)}`),
   deleteEnrollment: (id) => api.delete(`/api/enrollments/${id}`),

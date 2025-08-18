@@ -10,6 +10,21 @@ router.get('/my-status', authenticate, enrollmentController.getMyEnrollmentStatu
 // Admin: Get all enrollments
 router.get('/admin', authenticate, authorizeAdmin, enrollmentController.getAllEnrollments);
 
+// Admin: Get archived enrollments
+router.get('/admin/archived', authenticate, authorizeAdmin, enrollmentController.getArchivedEnrollments);
+
+// Admin: Archive enrollment
+router.put('/:id/archive', authenticate, authorizeAdmin, enrollmentController.archiveEnrollment);
+
+// Admin: Restore archived enrollment
+router.put('/:id/restore', authenticate, authorizeAdmin, enrollmentController.restoreEnrollment);
+
+// Admin: Bulk archive completed enrollments
+router.post('/admin/bulk-archive', authenticate, authorizeAdmin, enrollmentController.bulkArchiveCompletedEnrollments);
+
+// Admin: Archive students by section
+router.post('/admin/archive-by-section', authenticate, authorizeAdmin, enrollmentController.archiveStudentsBySection);
+
 // Test endpoint to verify grade filtering is working (no auth for testing)
 router.get('/test-grade-filter', async (req, res) => {
   const { section, gradeLevel } = req.query;

@@ -1061,6 +1061,30 @@ const EnrollmentAdminDashboard = () => {
                                   Assign Section
                                 </Button>
                               )}
+                              {(enrollment.status === 'enrolled' || enrollment.status === 'rejected') && (
+                                <Button
+                                  size="small"
+                                  variant="outlined"
+                                  color="warning"
+                                  startIcon={<ArchiveIcon />}
+                                  onClick={() => handleArchive(enrollment._id)}
+                                  sx={{ 
+                                    textTransform: 'none', 
+                                    borderRadius: 2, 
+                                    fontWeight: 500, 
+                                    px: 2, 
+                                    py: 0.5,
+                                    borderColor: 'orange',
+                                    color: 'orange',
+                                    '&:hover': {
+                                      backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                                      borderColor: 'darkorange',
+                                    }
+                                  }}
+                                >
+                                  Archive
+                                </Button>
+                              )}
                             </Box>
                           </TableCell>
         {/* Assign Section Modal */}

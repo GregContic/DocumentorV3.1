@@ -64,4 +64,75 @@ router.get('/grade/:gradeLevel', authenticate, authorizeAdmin, async (req, res) 
   }
 });
 
+// Update a section
+router.put('/:id', authenticate, authorizeAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { name, adviser } = req.body;
+    
+    console.log('[SECTION UPDATE] request by user:', req.user ? req.user.userId : 'no-user', 'id:', id, 'body:', req.body);
+    
+    // Validate required fields
+    if (!name || !adviser) {
+      return res.status(400).json({ message: 'Section name and adviser are required' });
+    }
+    
+    // Check if section exists
+    const existingSection = await Section.findById(id);
+    if (!existingSection) {
+      return res.status(404).json({ message: 'Section not found' });
+    }
+    
+    // Store the old section name for updating enrollments
+    const oldSectionName = existingSection.name;
+    const newSectionName = name.trim();
+    
+    // Check if another section with the same name and grade level already exists
+    const duplicateSection = await Section.findOne({
+      _id: { $ne: id },
+      name: newSectionName,
+      gradeLevel: existingSection.gradeLevel
+    });
+    
+    if (duplicateSection) {
+      return res.status(400).json({ message: 'A section with this name already exists for this grade level' });
+    }
+    
+    // Update the section
+    const updatedSection = await Section.findByIdAndUpdate(
+      id,
+      { 
+        name: newSectionName,
+        adviser: adviser.trim()
+      },
+      { new: true, runValidators: true }
+    );
+    
+    // If the section name changed, update all enrollment records that reference the old section name
+    if (oldSectionName !== newSectionName) {
+      const Enrollment = require('../models/Enrollment');
+      
+      console.log('[SECTION UPDATE] Updating enrollment records from section:', oldSectionName, 'to:', newSectionName, 'for grade:', existingSection.gradeLevel);
+      
+      const updateResult = await Enrollment.updateMany(
+        { 
+          section: oldSectionName,
+          gradeToEnroll: existingSection.gradeLevel
+        },
+        { 
+          $set: { section: newSectionName }
+        }
+      );
+      
+      console.log('[SECTION UPDATE] Updated', updateResult.modifiedCount, 'enrollment records');
+    }
+    
+    console.log('[SECTION UPDATE] updated section:', updatedSection._id, updatedSection.name, updatedSection.adviser);
+    res.json(updatedSection);
+  } catch (err) {
+    console.error('[SECTION UPDATE] error:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

@@ -18,7 +18,8 @@ exports.getEnrollmentsBySection = async (req, res) => {
     
     // Build query with section matching
     const query = {
-      section: { $regex: exactRegex }
+      section: { $regex: exactRegex },
+      isArchived: { $ne: true } // Exclude archived students
     };
     
     // Add grade level filtering if provided
@@ -191,13 +192,167 @@ exports.getMyEnrollmentStatus = async (req, res) => {
 // Get all enrollments (admin)
 exports.getAllEnrollments = async (req, res) => {
   try {
-    const enrollments = await Enrollment.find()
+    const enrollments = await Enrollment.find({ isArchived: { $ne: true } })
       .populate('user', 'firstName lastName email')
       .populate('reviewedBy', 'firstName lastName')
       .sort({ createdAt: -1 });
     res.json(enrollments);
   } catch (error) {
     res.status(500).json({ message: 'Failed to fetch enrollments', error: error.message });
+  }
+};
+
+// Get archived enrollments (admin)
+exports.getArchivedEnrollments = async (req, res) => {
+  try {
+    const archivedEnrollments = await Enrollment.find({ isArchived: true })
+      .populate('user', 'firstName lastName email')
+      .populate('reviewedBy', 'firstName lastName')
+      .populate('archivedBy', 'firstName lastName')
+      .sort({ archivedAt: -1 });
+    res.json({ success: true, data: archivedEnrollments });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to fetch archived enrollments', error: error.message });
+  }
+};
+
+// Archive enrollment (admin)
+exports.archiveEnrollment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const enrollment = await Enrollment.findByIdAndUpdate(
+      id,
+      {
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: req.user.userId
+      },
+      { new: true }
+    ).populate('user', 'firstName lastName email')
+     .populate('reviewedBy', 'firstName lastName')
+     .populate('archivedBy', 'firstName lastName');
+
+    if (!enrollment) {
+      return res.status(404).json({ message: 'Enrollment not found' });
+    }
+
+    res.json({ 
+      message: 'Enrollment archived successfully', 
+      enrollment 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to archive enrollment', error: error.message });
+  }
+};
+
+// Restore archived enrollment (admin)
+exports.restoreEnrollment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const enrollment = await Enrollment.findByIdAndUpdate(
+      id,
+      {
+        isArchived: false,
+        archivedAt: null,
+        archivedBy: null
+      },
+      { new: true }
+    ).populate('user', 'firstName lastName email')
+     .populate('reviewedBy', 'firstName lastName');
+
+    if (!enrollment) {
+      return res.status(404).json({ message: 'Enrollment not found' });
+    }
+
+    res.json({ 
+      message: 'Enrollment restored successfully', 
+      enrollment 
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to restore enrollment', error: error.message });
+  }
+};
+
+// Bulk archive completed enrollments (admin)
+exports.bulkArchiveCompletedEnrollments = async (req, res) => {
+  try {
+    const result = await Enrollment.updateMany(
+      { 
+        status: { $in: ['enrolled', 'rejected'] },
+        isArchived: { $ne: true }
+      },
+      {
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: req.user.userId
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully archived ${result.modifiedCount} completed enrollments`,
+      archivedCount: result.modifiedCount
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Failed to bulk archive enrollments', 
+      error: error.message 
+    });
+  }
+};
+
+// Archive all students in a section (admin)
+exports.archiveStudentsBySection = async (req, res) => {
+  try {
+    const { sectionName, gradeLevel } = req.body;
+    
+    if (!sectionName) {
+      return res.status(400).json({ message: 'Section name is required' });
+    }
+
+    // Build query to match students in the specific section
+    const raw = sectionName.trim();
+    const escaped = raw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const exactRegex = new RegExp(`^\\s*${escaped}\\s*$`, 'i');
+    
+    const query = {
+      section: { $regex: exactRegex },
+      isArchived: { $ne: true } // Only archive non-archived students
+    };
+    
+    // Add grade level filtering if provided
+    if (gradeLevel) {
+      const gradeVariants = [];
+      const cleanGrade = gradeLevel.replace(/^grade\s*/i, '').trim();
+      gradeVariants.push(cleanGrade);
+      gradeVariants.push(`Grade ${cleanGrade}`);
+      gradeVariants.push(gradeLevel);
+      
+      query.gradeToEnroll = {
+        $in: gradeVariants.map(variant => new RegExp(`^\\s*${variant.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`, 'i'))
+      };
+    }
+
+    const result = await Enrollment.updateMany(
+      query,
+      {
+        isArchived: true,
+        archivedAt: new Date(),
+        archivedBy: req.user.userId
+      }
+    );
+
+    res.json({
+      success: true,
+      message: `Successfully archived ${result.modifiedCount} students from section ${sectionName}`,
+      archivedCount: result.modifiedCount,
+      sectionName
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      message: 'Failed to archive students by section', 
+      error: error.message 
+    });
   }
 };
 

@@ -31,6 +31,7 @@ import AdminRequestDashboard from './admin/AdminRequestDashboard';
 import InquiriesDashboard from './admin/InquiriesDashboard';
 import Settings from './admin/Settings';
 import EnrollmentAdminDashboard from './admin/EnrollmentAdminDashboard';
+import EnrollmentArchive from './admin/EnrollmentArchive';
 import DocumentAdminDashboard from './admin/DocumentAdminDashboard';
 import SectionManagement from './admin/SectionManagement';
 
@@ -224,7 +225,7 @@ function App() {
               path="/admin/enrollment-archive"
               element={
                 <ProtectedRoute requireEnrollmentAdmin={true}>
-                  <Archive />
+                  <EnrollmentArchive />
                 </ProtectedRoute>
               }
             />

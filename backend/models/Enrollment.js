@@ -4,9 +4,12 @@ const EnrollmentSchema = new mongoose.Schema({
   user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   status: { 
     type: String, 
-    enum: ['pending', 'under-review', 'approved', 'rejected', 'enrolled'], 
+    enum: ['pending', 'under-review', 'approved', 'rejected', 'enrolled', 'archived'], 
     default: 'pending' 
   },
+  isArchived: { type: Boolean, default: false },
+  archivedAt: Date,
+  archivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
   enrollmentNumber: { type: String, unique: true },
   enrollmentType: { 
     type: String, 

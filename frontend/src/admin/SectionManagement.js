@@ -21,6 +21,8 @@ import {
   DialogActions,
   CircularProgress
 } from '@mui/material';
+import { Archive as ArchiveIcon, Edit as EditIcon } from '@mui/icons-material';
+import { enrollmentService } from '../services/api';
 import AdminLayout from '../components/AdminLayout';
 
 const gradeLevels = [
@@ -38,6 +40,13 @@ const SectionManagement = () => {
   const [selectedSection, setSelectedSection] = useState(null);
   const [enrolledStudents, setEnrolledStudents] = useState([]);
   const [studentsLoading, setStudentsLoading] = useState(false);
+  const [archiveDialogOpen, setArchiveDialogOpen] = useState(false);
+  const [sectionToArchive, setSectionToArchive] = useState(null);
+  const [archiving, setArchiving] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [sectionToEdit, setSectionToEdit] = useState(null);
+  const [editForm, setEditForm] = useState({ name: '', adviser: '' });
+  const [updating, setUpdating] = useState(false);
   const handleManageSection = async (section) => {
     // Always refresh sections and student counts before opening modal
     await fetchSections();
@@ -99,6 +108,102 @@ const SectionManagement = () => {
     setEnrolledStudents([]);
   };
 
+  const handleArchiveSection = async (section) => {
+    setSectionToArchive(section);
+    setArchiveDialogOpen(true);
+  };
+
+  const handleConfirmArchive = async () => {
+    if (!sectionToArchive) return;
+    
+    setArchiving(true);
+    try {
+      const response = await enrollmentService.archiveStudentsBySection(
+        sectionToArchive.name,
+        sectionToArchive.gradeLevel
+      );
+      
+      if (response.data.success) {
+        setSuccess(`Successfully archived ${response.data.archivedCount} students from section ${sectionToArchive.name}`);
+        // Refresh sections and student counts
+        await fetchSections();
+        // If the manage modal is open for this section, refresh the student list
+        if (selectedSection && selectedSection._id === sectionToArchive._id) {
+          await handleManageSection(selectedSection);
+        }
+      } else {
+        setError('Failed to archive section students');
+      }
+    } catch (err) {
+      console.error('Error archiving section students:', err);
+      setError('Failed to archive section students: ' + (err.response?.data?.message || err.message));
+    } finally {
+      setArchiving(false);
+      setArchiveDialogOpen(false);
+      setSectionToArchive(null);
+    }
+  };
+
+  const handleCancelArchive = () => {
+    setArchiveDialogOpen(false);
+    setSectionToArchive(null);
+  };
+
+  const handleEditSection = (section) => {
+    setSectionToEdit(section);
+    setEditForm({
+      name: section.name,
+      adviser: section.adviser
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditFormChange = (e) => {
+    setEditForm({ ...editForm, [e.target.name]: e.target.value });
+  };
+
+  const handleConfirmEdit = async () => {
+    if (!sectionToEdit) return;
+    
+    setUpdating(true);
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`http://localhost:5000/api/sections/${sectionToEdit._id}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          name: editForm.name,
+          adviser: editForm.adviser
+        })
+      });
+      
+      if (res.ok) {
+        setSuccess('Section updated successfully');
+        await fetchSections();
+        setEditDialogOpen(false);
+        setSectionToEdit(null);
+        setEditForm({ name: '', adviser: '' });
+      } else {
+        const errorData = await res.json();
+        setError(errorData.message || 'Failed to update section');
+      }
+    } catch (err) {
+      console.error('Error updating section:', err);
+      setError('Failed to update section: ' + err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setEditDialogOpen(false);
+    setSectionToEdit(null);
+    setEditForm({ name: '', adviser: '' });
+  };
+
   useEffect(() => {
     fetchSections();
   }, []);
@@ -129,8 +234,8 @@ const SectionManagement = () => {
         });
         if (res.ok) {
           const data = await res.json();
-          // Only count students with status 'enrolled'
-          const enrolledCount = Array.isArray(data) ? data.filter(e => e.status === 'enrolled').length : 0;
+          // Only count students with status 'enrolled' and not archived
+          const enrolledCount = Array.isArray(data) ? data.filter(e => e.status === 'enrolled' && !e.isArchived).length : 0;
           counts[section._id] = enrolledCount;
           console.log('[SectionCounts] Section', sectionName, 'has', enrolledCount, 'enrolled students');
         } else {
@@ -244,9 +349,49 @@ const SectionManagement = () => {
                       : `0/${section.capacity}`}
                   </TableCell>
                   <TableCell>
-                    <Button variant="outlined" size="small" onClick={() => handleManageSection(section)}>
-                      Manage
-                    </Button>
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button 
+                        variant="outlined" 
+                        size="small" 
+                        onClick={() => handleManageSection(section)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Manage
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="primary"
+                        startIcon={<EditIcon />}
+                        onClick={() => handleEditSection(section)}
+                        sx={{ textTransform: 'none' }}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="warning"
+                        startIcon={<ArchiveIcon />}
+                        onClick={() => handleArchiveSection(section)}
+                        disabled={sectionStudentCounts[section._id] === 0}
+                        sx={{ 
+                          textTransform: 'none',
+                          borderColor: 'orange',
+                          color: 'orange',
+                          '&:hover': {
+                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                            borderColor: 'darkorange',
+                          },
+                          '&:disabled': {
+                            borderColor: 'rgba(0, 0, 0, 0.12)',
+                            color: 'rgba(0, 0, 0, 0.26)',
+                          }
+                        }}
+                      >
+                        Archive
+                      </Button>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))}
@@ -383,6 +528,127 @@ const SectionManagement = () => {
             <Button onClick={handleCloseManage} variant="contained">Close</Button>
           </DialogActions>
         </Dialog>
+
+        {/* Archive Section Confirmation Dialog */}
+        <Dialog 
+          open={archiveDialogOpen} 
+          onClose={handleCancelArchive}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ 
+            backgroundColor: 'warning.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
+          }}>
+            <ArchiveIcon />
+            Archive Section: {sectionToArchive?.name}
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Typography variant="body1" sx={{ mb: 2 }}>
+              Are you sure you want to archive all students in section <strong>{sectionToArchive?.name}</strong> 
+              ({sectionToArchive?.gradeLevel})?
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+              This will archive approximately <strong>{sectionStudentCounts[sectionToArchive?._id] || 0}</strong> students.
+            </Typography>
+            <Alert severity="warning" sx={{ mb: 2 }}>
+              This action will move all enrolled students in this section to the enrollment archive. 
+              You can restore them individually from the enrollment archive if needed.
+            </Alert>
+          </DialogContent>
+          <DialogActions sx={{ p: 3 }}>
+            <Button 
+              onClick={handleCancelArchive}
+              disabled={archiving}
+              sx={{ textTransform: 'none' }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmArchive}
+              variant="contained"
+              color="warning"
+              disabled={archiving}
+              startIcon={archiving ? <CircularProgress size={16} /> : <ArchiveIcon />}
+              sx={{ 
+                textTransform: 'none',
+                ml: 2
+              }}
+            >
+              {archiving ? 'Archiving...' : 'Archive Section'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Edit Section Dialog */}
+        <Dialog 
+          open={editDialogOpen} 
+          onClose={handleCancelEdit}
+          maxWidth="sm"
+          fullWidth
+        >
+          <DialogTitle sx={{ 
+            backgroundColor: 'primary.main',
+            color: 'white',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2
+          }}>
+            <EditIcon />
+            Edit Section: {sectionToEdit?.name}
+          </DialogTitle>
+          <DialogContent sx={{ pt: 3 }}>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  name="name"
+                  label="Section Name"
+                  value={editForm.name}
+                  onChange={handleEditFormChange}
+                  fullWidth
+                  variant="outlined"
+                  sx={{ mb: 2 }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  name="adviser"
+                  label="Adviser"
+                  value={editForm.adviser}
+                  onChange={handleEditFormChange}
+                  fullWidth
+                  variant="outlined"
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ p: 3 }}>
+            <Button 
+              onClick={handleCancelEdit}
+              disabled={updating}
+              sx={{ textTransform: 'none' }}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleConfirmEdit}
+              variant="contained"
+              color="primary"
+              disabled={updating || !editForm.name.trim() || !editForm.adviser.trim()}
+              startIcon={updating ? <CircularProgress size={16} /> : <EditIcon />}
+              sx={{ 
+                textTransform: 'none',
+                ml: 2
+              }}
+            >
+              {updating ? 'Updating...' : 'Update Section'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
         <Snackbar open={!!success} autoHideDuration={4000} onClose={() => setSuccess('')} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
           <Alert severity="success" onClose={() => setSuccess('')}>{success}</Alert>
         </Snackbar>
