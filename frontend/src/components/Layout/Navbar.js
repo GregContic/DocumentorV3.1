@@ -225,6 +225,12 @@ const Navbar = () => {
     </Box>
   );
 
+  // For desktop/top-nav: hide the 'Enrollment' button on selected public pages (home, login)
+  const hideEnrollmentOn = ['/', '/login'];
+  const desktopNavItems = navItems.filter(
+    (item) => !(item.text === 'Enrollment' && hideEnrollmentOn.includes(location.pathname))
+  );
+
   return (
     <AppBar 
       position="sticky" 
@@ -290,7 +296,7 @@ const Navbar = () => {
             </>
           ) : (
             <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-              {navItems.map((item) => (
+              {desktopNavItems.map((item) => (
                 <Button
                   key={item.text}
                   onClick={() => navigate(item.path)}

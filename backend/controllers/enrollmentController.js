@@ -88,6 +88,24 @@ exports.createEnrollment = async (req, res) => {
       return res.status(401).json({ message: 'Authentication required to submit enrollment' });
     }
     
+    // Check if user already has an enrollment (prevent duplicates)
+    const existingEnrollment = await Enrollment.findOne({ 
+      user: req.user.userId,
+      isArchived: { $ne: true } // Only check non-archived enrollments
+    });
+    
+    if (existingEnrollment) {
+      return res.status(400).json({ 
+        message: 'You have already submitted an enrollment application. Only one enrollment per student is allowed.',
+        hasExistingEnrollment: true,
+        existingEnrollment: {
+          enrollmentNumber: existingEnrollment.enrollmentNumber,
+          status: existingEnrollment.status,
+          createdAt: existingEnrollment.createdAt
+        }
+      });
+    }
+    
     // Remove any fields that don't exist in the model schema
     delete enrollmentData.birthCertificate; // We removed this field from the model
     

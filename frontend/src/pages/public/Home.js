@@ -140,8 +140,8 @@ const Home = () => {
         />
 
         <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 2 }}>
-          <Grid container spacing={6} alignItems="center">
-            <Grid item xs={12} md={6}>
+          <Grid container spacing={6} alignItems="center" justifyContent="center">
+            <Grid item xs={12} md={8} lg={7}>
               <Box
                 sx={{
                   background: 'rgba(255, 255, 255, 0.1)',
@@ -215,7 +215,6 @@ const Home = () => {
                   Experience the next generation of document management and enrollment 
                   with our AI-powered, glassmorphic interface designed for the modern student.
                 </Typography>
-                
                 <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', sm: 'row' } }}>
                   {!isAuthenticated ? (
                     <>
@@ -305,40 +304,6 @@ const Home = () => {
                       Enter Dashboard
                     </Button>
                   )}
-                </Box>
-              </Box>
-            </Grid>
-            
-            <Grid item xs={12} md={6}>
-              <Box sx={{ 
-                textAlign: 'center',
-                animation: 'slideInRight 1s ease-out',
-                '@keyframes slideInRight': {
-                  '0%': { opacity: 0, transform: 'translateX(50px)' },
-                  '100%': { opacity: 1, transform: 'translateX(0)' },
-                },
-                ml: { xs: 0, md: 8, lg: 12 },
-              }}>
-                <Box
-                  sx={{
-                    position: 'relative',
-                    display: 'inline-block',
-                  }}
-                >
-                  <img
-                    src={easternestetik}
-                    alt="Eastern La Trinidad National High School building at sunset"
-                    style={{
-                      width: '100%',
-                      maxWidth: '450px',
-                      height: 'auto',
-                      borderRadius: '32px',
-                      boxShadow: '0 32px 64px rgba(0,0,0,0.2)',
-                      border: '2px solid rgba(255,255,255,0.2)',
-                      position: 'relative',
-                      zIndex: 1,
-                    }}
-                  />
                 </Box>
               </Box>
             </Grid>

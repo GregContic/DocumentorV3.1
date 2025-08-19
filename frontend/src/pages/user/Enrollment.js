@@ -58,6 +58,8 @@ const Enrollment = () => {
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const [aiExtracting, setAIExtracting] = useState(false);
+  const [enrollmentStatus, setEnrollmentStatus] = useState(null);
+  const [checkingEnrollment, setCheckingEnrollment] = useState(true);
 
   const [formData, setFormData] = useState({
     // Enrollment Type
@@ -147,6 +149,31 @@ const Enrollment = () => {
     }
   }, [isAuthenticated, navigate]);
 
+  // Check if user already has an enrollment
+  useEffect(() => {
+    const checkExistingEnrollment = async () => {
+      if (!isAuthenticated) return;
+      
+      setCheckingEnrollment(true);
+      try {
+        const response = await enrollmentService.getMyEnrollmentStatus();
+        setEnrollmentStatus(response.data);
+        
+        if (response.data.hasEnrollment) {
+          // User already has an enrollment, redirect to status page
+          navigate('/enrollment-status');
+        }
+      } catch (error) {
+        console.error('Error checking enrollment status:', error);
+        // Continue to allow form if check fails
+      } finally {
+        setCheckingEnrollment(false);
+      }
+    };
+
+    checkExistingEnrollment();
+  }, [isAuthenticated, navigate]);
+
   // Auto-populate school info for continuing students
   useEffect(() => {
     if (formData.enrollmentType === 'old') {
@@ -169,6 +196,18 @@ const Enrollment = () => {
   // Don't render if not authenticated
   if (!isAuthenticated) {
     return null;
+  }
+
+  // Show loading while checking existing enrollment
+  if (checkingEnrollment) {
+    return (
+      <Container maxWidth="md" sx={{ mt: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
+        <Box sx={{ textAlign: 'center' }}>
+          <CircularProgress size={40} sx={{ mb: 2 }} />
+          <Typography>Checking enrollment status...</Typography>
+        </Box>
+      </Container>
+    );
   }
 
   // Accept extracted data and autofill the form
@@ -435,8 +474,18 @@ const Enrollment = () => {
     } catch (error) {
       console.error('Enrollment submission error:', error);
       let errorMsg = 'Failed to submit enrollment application. Please try again.';
+      
       if (error.response?.status === 400) {
-        errorMsg = 'Invalid enrollment data. Please check your inputs and try again.';
+        if (error.response.data?.hasExistingEnrollment) {
+          // User already has an enrollment
+          errorMsg = 'You have already submitted an enrollment application. You can only submit one enrollment per student.';
+          // Redirect to enrollment status page after showing error
+          setTimeout(() => {
+            navigate('/enrollment-status');
+          }, 3000);
+        } else {
+          errorMsg = error.response.data?.message || 'Invalid enrollment data. Please check your inputs and try again.';
+        }
       } else if (error.response?.data?.message) {
         errorMsg = error.response.data.message;
       }
