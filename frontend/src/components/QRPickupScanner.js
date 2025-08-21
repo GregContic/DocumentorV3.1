@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import jsQR from 'jsqr';
 import {
   Dialog,
   DialogTitle,
@@ -20,6 +21,10 @@ import {
   CheckCircle as CheckIcon,
   Cancel as CancelIcon,
   CameraAlt as CameraIcon,
+  CloudUpload as UploadIcon,
+  Delete as DeleteIcon,
+  Image as ImageIcon,
+  PictureAsPdf as PdfIcon,
 } from '@mui/icons-material';
 import { documentService } from '../services/api';
 
@@ -30,6 +35,8 @@ const QRPickupScanner = ({ open, onClose, onPickupComplete }) => {
   const [error, setError] = useState('');
   const [manualCode, setManualCode] = useState('');
   const [pickedUpBy, setPickedUpBy] = useState('');
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [processingFile, setProcessingFile] = useState(false);
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -108,6 +115,100 @@ const QRPickupScanner = ({ open, onClose, onPickupComplete }) => {
     await verifyQRCode(manualCode.trim());
   };
 
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a valid image (JPG, PNG) or PDF file');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      setError('File size must be less than 10MB');
+      return;
+    }
+
+    setUploadedFile(file);
+    setProcessingFile(true);
+    setError('');
+
+    try {
+      // For images, try to extract QR code
+      if (file.type.startsWith('image/')) {
+        await extractQRFromImage(file);
+      } else {
+        // For PDFs, show manual input option
+        setError('PDF uploaded. Please manually enter the verification code from the document.');
+        setProcessingFile(false);
+      }
+    } catch (error) {
+      console.error('Error processing file:', error);
+      setError('Failed to process the uploaded file. Please try manual entry.');
+      setProcessingFile(false);
+    }
+  };
+
+  const extractQRFromImage = async (imageFile) => {
+    try {
+      // Create image element to load the file
+      const img = new Image();
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+
+      return new Promise((resolve, reject) => {
+        img.onload = () => {
+          try {
+            // Set canvas size to image size
+            canvas.width = img.width;
+            canvas.height = img.height;
+            
+            // Draw image to canvas
+            ctx.drawImage(img, 0, 0);
+            
+            // Get image data for QR detection
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            
+            // Use jsQR to detect QR code
+            const qrCode = jsQR(imageData.data, imageData.width, imageData.height);
+            
+            if (qrCode) {
+              console.log('QR Code detected:', qrCode.data);
+              // Automatically verify the detected QR code
+              verifyQRCode(qrCode.data);
+              setProcessingFile(false);
+              resolve();
+            } else {
+              setError('No QR code found in the uploaded image. Please try a clearer image or use manual entry.');
+              setProcessingFile(false);
+              resolve();
+            }
+            
+          } catch (error) {
+            reject(error);
+          }
+        };
+        
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = URL.createObjectURL(imageFile);
+      });
+      
+    } catch (error) {
+      throw error;
+    }
+  };
+
+  const clearUploadedFile = () => {
+    setUploadedFile(null);
+    setProcessingFile(false);
+    // Reset file input
+    const fileInput = document.getElementById('qr-file-upload');
+    if (fileInput) fileInput.value = '';
+  };
+
   const verifyQRCode = async (qrData) => {
     try {
       setVerifying(true);
@@ -174,6 +275,7 @@ const QRPickupScanner = ({ open, onClose, onPickupComplete }) => {
     setError('');
     setManualCode('');
     setPickedUpBy('');
+    clearUploadedFile();
     onClose();
   };
 
@@ -302,6 +404,87 @@ const QRPickupScanner = ({ open, onClose, onPickupComplete }) => {
                   Verify
                 </Button>
               </Box>
+            </Paper>
+
+            {/* File Upload Section */}
+            <Paper sx={{ p: 2, mt: 3, backgroundColor: '#fff8e1', border: '1px solid #ffa726' }}>
+              <Typography variant="subtitle1" gutterBottom sx={{ color: '#f57c00' }}>
+                Upload Pickup Stub Image or PDF
+              </Typography>
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                Upload a photo of the pickup stub or the PDF file to extract verification code
+              </Typography>
+              
+              <Box sx={{ mb: 2 }}>
+                <input
+                  accept="image/*,.pdf"
+                  style={{ display: 'none' }}
+                  id="qr-file-upload"
+                  type="file"
+                  onChange={handleFileUpload}
+                />
+                <label htmlFor="qr-file-upload">
+                  <Button
+                    variant="outlined"
+                    component="span"
+                    startIcon={<UploadIcon />}
+                    disabled={processingFile}
+                    sx={{ 
+                      color: '#f57c00',
+                      borderColor: '#f57c00',
+                      '&:hover': {
+                        borderColor: '#ef6c00',
+                        backgroundColor: 'rgba(255, 167, 38, 0.04)'
+                      }
+                    }}
+                  >
+                    {processingFile ? 'Processing...' : 'Choose File'}
+                  </Button>
+                </label>
+              </Box>
+
+              {uploadedFile && (
+                <Box sx={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: 2, 
+                  p: 2, 
+                  backgroundColor: 'rgba(255, 167, 38, 0.1)',
+                  borderRadius: 1,
+                  border: '1px dashed #ffa726'
+                }}>
+                  {uploadedFile.type.startsWith('image/') ? (
+                    <ImageIcon sx={{ color: '#f57c00' }} />
+                  ) : (
+                    <PdfIcon sx={{ color: '#f57c00' }} />
+                  )}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                      {uploadedFile.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {(uploadedFile.size / 1024 / 1024).toFixed(2)} MB
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    onClick={clearUploadedFile}
+                    startIcon={<DeleteIcon />}
+                    sx={{ color: '#d32f2f' }}
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              )}
+
+              {processingFile && (
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                  <CircularProgress size={20} />
+                  <Typography variant="body2" color="text.secondary">
+                    Processing uploaded file...
+                  </Typography>
+                </Box>
+              )}
             </Paper>
 
             {error && (
