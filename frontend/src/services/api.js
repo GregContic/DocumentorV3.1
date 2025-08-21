@@ -69,6 +69,9 @@ export const documentService = {
   },
   getMyRequests: () => api.get('/api/documents/my-requests'),
   getRequestById: (id) => api.get(`/api/documents/request/${id}`),
+  downloadPickupStub: (requestId) => api.get(`/api/documents/request/${requestId}/pickup-stub`, { 
+    responseType: 'blob' 
+  }),
   
   // Admin specific endpoints
   getAllRequests: () => api.get('/api/documents/admin/documents/requests'),
@@ -90,6 +93,12 @@ export const documentService = {
     api.patch(`/api/documents/admin/documents/request/${requestId}/restore`),
   bulkArchiveCompletedRequests: () =>
     api.post('/api/documents/admin/documents/bulk-archive-completed'),
+  
+  // QR Code and Pickup endpoints
+  verifyPickupQR: (qrData) => 
+    api.post('/api/documents/admin/documents/verify-qr', { qrData }),
+  markAsPickedUp: (requestId, pickupData) =>
+    api.patch(`/api/documents/admin/documents/request/${requestId}/mark-picked-up`, pickupData),
 };
 
 // Enrollment services

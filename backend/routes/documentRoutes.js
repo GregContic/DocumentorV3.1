@@ -35,6 +35,7 @@ const upload = multer({
 router.post('/request', authenticate, preventAdminSubmission, upload.array('documents', 5), documentController.createRequest);
 router.get('/my-requests', authenticate, preventAdminSubmission, documentController.getMyRequests);
 router.get('/request/:requestId', authenticate, documentController.getRequestById);
+router.get('/request/:requestId/pickup-stub', authenticate, preventAdminSubmission, documentController.downloadPickupStub);
 
 // Admin routes
 router.get('/admin/documents/requests', authenticate, authorizeAdmin, documentController.getAllRequests);
@@ -47,5 +48,7 @@ router.get('/admin/documents/archived-requests', authenticate, authorizeAdmin, d
 router.post('/admin/documents/bulk-archive-completed', authenticate, authorizeAdmin, documentController.bulkArchiveCompletedRequests);
 router.patch('/admin/documents/request/:requestId/archive', authenticate, authorizeAdmin, documentController.archiveRequest);
 router.patch('/admin/documents/request/:requestId/restore', authenticate, authorizeAdmin, documentController.restoreArchivedRequest);
+router.post('/admin/documents/verify-qr', authenticate, authorizeAdmin, documentController.verifyPickupQR);
+router.patch('/admin/documents/request/:requestId/mark-picked-up', authenticate, authorizeAdmin, documentController.markAsPickedUp);
 
 module.exports = router;

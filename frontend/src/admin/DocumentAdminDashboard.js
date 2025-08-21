@@ -26,6 +26,9 @@ import {
   DialogActions,
   Divider,
   InputAdornment,
+  FormControl,
+  InputLabel,
+  Select,
 } from '@mui/material';
 import { 
   QrCodeScanner as QrIcon,
@@ -35,12 +38,20 @@ import {
   Assignment as Form137Icon,
   Assignment as AssignmentIcon,
   CheckCircle as CheckIcon,
+  CheckCircle as CheckCircleIcon,
   Description as DocumentIcon,
   Cancel as CancelIcon,
+  Schedule as ScheduleIcon,
+  Event as EventIcon,
 } from '@mui/icons-material';
+import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
+import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
+import dayjs from 'dayjs';
 import { Link as RouterLink } from 'react-router-dom';
 import { documentService } from '../services/api';
 import QRVerificationDialog from '../components/QRVerificationDialog';
+import QRPickupScanner from '../components/QRPickupScanner';
 import AdminLayout from '../components/AdminLayout';
 import StatsCard from '../components/StatsCard';
 
@@ -75,6 +86,27 @@ const DocumentAdminDashboard = () => {
     rejected: 0,
     completed: 0
   });
+
+  // Add new state variables for pickup scheduling
+  const [approveDialogOpen, setApproveDialogOpen] = useState(false);
+  const [pickupDateTime, setPickupDateTime] = useState(new Date());
+  const [pickupTimeSlot, setPickupTimeSlot] = useState('');
+  const [requestToApprove, setRequestToApprove] = useState(null);
+  
+  // QR Scanner state
+  const [qrScannerOpen, setQrScannerOpen] = useState(false);
+
+  // Add pickup time slots
+  const timeSlots = [
+    { value: '08:00-09:00', label: '8:00 AM - 9:00 AM' },
+    { value: '09:00-10:00', label: '9:00 AM - 10:00 AM' },
+    { value: '10:00-11:00', label: '10:00 AM - 11:00 AM' },
+    { value: '11:00-12:00', label: '11:00 AM - 12:00 PM' },
+    { value: '13:00-14:00', label: '1:00 PM - 2:00 PM' },
+    { value: '14:00-15:00', label: '2:00 PM - 3:00 PM' },
+    { value: '15:00-16:00', label: '3:00 PM - 4:00 PM' },
+    { value: '16:00-17:00', label: '4:00 PM - 5:00 PM' },
+  ];
 
   useEffect(() => {
     fetchRequests();
@@ -121,8 +153,14 @@ const DocumentAdminDashboard = () => {
       return;
     }
     
+    if (newStatus === 'approved') {
+      setRequestToApprove(requests.find(req => req._id === requestId));
+      setApproveDialogOpen(true);
+      return;
+    }
+    
     try {
-      const response = await documentService.updateRequestStatus(requestId, newStatus);
+      const response = await documentService.updateRequestStatus(requestId, { status: newStatus });
       
       if (newStatus === 'completed') {
         setRequests(prevRequests => prevRequests.filter(req => req._id !== requestId));
@@ -146,7 +184,8 @@ const DocumentAdminDashboard = () => {
 
     setUpdating(true);
     try {
-      await documentService.updateRequestStatus(selectedRequest._id, 'rejected', {
+      await documentService.updateRequestStatus(selectedRequest._id, {
+        status: 'rejected',
         rejectionReason: rejectionReason.trim()
       });
       
@@ -188,6 +227,78 @@ const DocumentAdminDashboard = () => {
     setRequestDetails(null);
   };
 
+  // Add new handler for approving with pickup schedule
+  const handleApproveWithSchedule = async () => {
+    console.log('handleApproveWithSchedule called');
+    console.log('pickupDateTime:', pickupDateTime);
+    console.log('pickupTimeSlot:', pickupTimeSlot);
+    console.log('requestToApprove:', requestToApprove);
+
+    if (!pickupDateTime || !pickupTimeSlot) {
+      console.log('Validation failed: missing pickup details');
+      setError('Please select both pickup date and time slot.');
+      return;
+    }
+
+    if (!requestToApprove) {
+      console.log('Validation failed: no request to approve');
+      setError('No request selected for approval.');
+      return;
+    }
+
+    setUpdating(true);
+    setError(''); // Clear any previous errors
+    
+    try {
+      console.log('Approving request with pickup schedule:', {
+        requestId: requestToApprove._id,
+        pickupDateTime: pickupDateTime.toISOString(),
+        pickupTimeSlot: pickupTimeSlot
+      });
+
+      const response = await documentService.updateRequestStatus(requestToApprove._id, {
+        status: 'approved',
+        pickupDateTime: pickupDateTime.toISOString(),
+        pickupTimeSlot: pickupTimeSlot,
+        pickupInstructions: 'Please bring a valid ID and this pickup notification when collecting your document.'
+      });
+      
+      console.log('Approval response:', response);
+      
+      setSuccessMessage('Request approved with pickup schedule set successfully!');
+      setShowSuccessMessage(true);
+      fetchRequests();
+      handleCloseApproveDialog();
+    } catch (error) {
+      console.error('Error approving request:', error);
+      console.error('Error details:', error.response?.data);
+      setError(error.response?.data?.message || 'Failed to approve request. Please try again.');
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  // Add handler to close approve dialog
+  const handleCloseApproveDialog = () => {
+    setApproveDialogOpen(false);
+    setRequestToApprove(null);
+    setPickupDateTime(new Date());
+    setPickupTimeSlot('');
+  };
+
+  // Handle successful pickup completion
+  const handlePickupComplete = (completedRequest) => {
+    // Refresh the requests to show updated status
+    fetchRequests();
+    
+    // Show success message
+    setSuccessMessage(`Document pickup completed for ${completedRequest.studentName}`);
+    setShowSuccessMessage(true);
+    
+    // Close the QR scanner
+    setQrScannerOpen(false);
+  };
+
   const formatFieldValue = (value) => {
     if (!value) return 'Not provided';
     if (value instanceof Date) return value.toLocaleDateString();
@@ -209,7 +320,8 @@ const DocumentAdminDashboard = () => {
   });
 
   return (
-    <AdminLayout title="Document Management Dashboard">
+    <LocalizationProvider dateAdapter={AdapterDateFns}>
+      <AdminLayout title="Document Management Dashboard">
       <Container maxWidth="xl">
         {/* Modern Header Card */}
         <Box sx={{ 
@@ -332,6 +444,33 @@ const DocumentAdminDashboard = () => {
             }}
           >
             Verify Document QR Code
+          </Button>
+
+          <Button
+            variant="contained"
+            size="large"
+            startIcon={<QrIcon />}
+            onClick={() => setQrScannerOpen(true)}
+            sx={{
+              background: 'linear-gradient(135deg, #4caf50 0%, #388e3c 100%)',
+              color: 'white',
+              borderRadius: 3,
+              px: 4,
+              py: 1.5,
+              textTransform: 'none',
+              fontWeight: 600,
+              fontSize: '1rem',
+              boxShadow: '0 8px 24px rgba(76, 175, 80, 0.3)',
+              border: '1px solid rgba(255,255,255,0.2)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, #388e3c 0%, #2e7d32 100%)',
+                transform: 'translateY(-2px)',
+                boxShadow: '0 12px 32px rgba(76, 175, 80, 0.4)',
+              },
+              transition: 'all 0.3s ease-in-out',
+            }}
+          >
+            QR Pickup Scanner
           </Button>
 
           <Button
@@ -699,6 +838,7 @@ const DocumentAdminDashboard = () => {
                                       variant="contained"
                                       color="success"
                                       onClick={() => handleStatusChange(request._id, 'approved')}
+                                      startIcon={<ScheduleIcon />}
                                       sx={{ 
                                         textTransform: 'none',
                                         borderRadius: 2,
@@ -707,7 +847,7 @@ const DocumentAdminDashboard = () => {
                                         py: 0.5,
                                       }}
                                     >
-                                      Approve
+                                      Approve & Schedule
                                     </Button>
                                     <Button
                                       size="small"
@@ -1093,8 +1233,145 @@ const DocumentAdminDashboard = () => {
             </Button>
           </DialogActions>
         </Dialog>
+
+        {/* Approval Dialog with Pickup Scheduling */}
+        <Dialog 
+          open={approveDialogOpen} 
+          onClose={handleCloseApproveDialog}
+          maxWidth="md"
+          fullWidth
+          sx={{
+            '& .MuiDialog-paper': {
+              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+              color: 'white',
+              borderRadius: 3,
+              boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+            },
+          }}
+        >
+          <DialogTitle sx={{ 
+            textAlign: 'center', 
+            pb: 1,
+            background: 'rgba(255, 255, 255, 0.1)',
+            borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+          }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+              <ScheduleIcon sx={{ fontSize: 28 }} />
+              <Typography variant="h5" component="div">
+                Schedule Document Pickup
+              </Typography>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ p: 4 }}>
+            <Typography variant="body1" sx={{ mb: 3, textAlign: 'center', opacity: 0.9 }}>
+              Select a pickup date and time for the approved Form 137 request
+            </Typography>
+            
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {/* Date and Time Picker */}
+              <DateTimePicker
+                label="Pickup Date & Time"
+                value={pickupDateTime}
+                onChange={(newValue) => setPickupDateTime(newValue)}
+                minDateTime={dayjs().add(1, 'day')}
+                maxDateTime={dayjs().add(30, 'day')}
+                sx={{
+                  '& .MuiInputLabel-root': {
+                    color: 'rgba(255, 255, 255, 0.9)',
+                  },
+                  '& .MuiInputBase-input': {
+                    color: 'white',
+                  },
+                  '& .MuiOutlinedInput-root': {
+                    '& fieldset': {
+                      borderColor: 'rgba(255, 255, 255, 0.3)',
+                    },
+                    '&:hover fieldset': {
+                      borderColor: 'rgba(255, 255, 255, 0.5)',
+                    },
+                    '&.Mui-focused fieldset': {
+                      borderColor: 'rgba(255, 255, 255, 0.8)',
+                    },
+                  },
+                  '& .MuiSvgIcon-root': {
+                    color: 'rgba(255, 255, 255, 0.8)',
+                  },
+                }}
+              />
+
+              {/* Time Slot Selection */}
+              <Box>
+                <Typography variant="body2" sx={{ mb: 2, opacity: 0.9 }}>
+                  Or choose a preferred time slot:
+                </Typography>
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                  {timeSlots.map((slot) => (
+                    <Chip
+                      key={slot.value}
+                      label={slot.label}
+                      clickable
+                      variant={pickupTimeSlot === slot.value ? "filled" : "outlined"}
+                      onClick={() => setPickupTimeSlot(slot.value)}
+                      sx={{
+                        color: pickupTimeSlot === slot.value ? 'white' : 'rgba(255, 255, 255, 0.8)',
+                        backgroundColor: pickupTimeSlot === slot.value ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+                        borderColor: 'rgba(255, 255, 255, 0.3)',
+                        '&:hover': {
+                          backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                        },
+                      }}
+                    />
+                  ))}
+                </Box>
+              </Box>
+            </Box>
+          </DialogContent>
+          <DialogActions sx={{ 
+            p: 3, 
+            backgroundColor: 'rgba(255, 255, 255, 0.05)',
+            borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+          }}>
+            <Button 
+              onClick={handleCloseApproveDialog}
+              sx={{ 
+                color: 'rgba(255, 255, 255, 0.8)',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                },
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={handleApproveWithSchedule}
+              variant="contained"
+              disabled={updating || !pickupDateTime || !pickupTimeSlot}
+              startIcon={<CheckCircleIcon />}
+              sx={{ 
+                ml: 2,
+                background: 'linear-gradient(45deg, #4caf50, #66bb6a)',
+                '&:hover': {
+                  background: 'linear-gradient(45deg, #66bb6a, #4caf50)',
+                },
+                '&:disabled': {
+                  background: 'rgba(255, 255, 255, 0.2)',
+                },
+              }}
+            >
+              {updating ? <CircularProgress size={20} color="inherit" /> : 'Approve & Schedule'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* QR Pickup Scanner Dialog */}
+        <QRPickupScanner
+          open={qrScannerOpen}
+          onClose={() => setQrScannerOpen(false)}
+          onPickupComplete={handlePickupComplete}
+        />
       </Container>
     </AdminLayout>
+    </LocalizationProvider>
   );
 };
 

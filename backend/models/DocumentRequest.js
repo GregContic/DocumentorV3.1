@@ -106,6 +106,39 @@ const documentRequestSchema = new mongoose.Schema({
   reviewedAt: {
     type: Date
   },
+  
+  // Pickup Scheduling (for approved requests)
+  pickupSchedule: {
+    scheduledDateTime: {
+      type: Date
+    },
+    timeSlot: {
+      type: String
+    },
+    scheduledBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
+    scheduledAt: {
+      type: Date
+    },
+    pickedUpAt: {
+      type: Date
+    },
+    pickedUpBy: {
+      type: String // Name of person who picked up
+    },
+    qrCode: {
+      type: String // QR code for pickup verification
+    },
+    verificationCode: {
+      type: String // Human-readable verification code
+    },
+    stubPath: {
+      type: String // Path to the generated pickup stub file
+    }
+  },
+  
   archived: {
     type: Boolean,
     default: false

@@ -1,6 +1,7 @@
 const DocumentRequest = require('../models/DocumentRequest');
 const User = require('../models/User');
 const notificationService = require('../utils/notificationService');
+const pickupStubService = require('../utils/pickupStubService');
 const path = require('path');
 const fs = require('fs');
 
@@ -186,7 +187,7 @@ exports.getAllRequests = async (req, res) => {
 exports.updateRequestStatus = async (req, res) => {
   try {
     const { requestId } = req.params;
-    const { status, rejectionReason, reviewNotes } = req.body;
+    const { status, rejectionReason, reviewNotes, pickupDateTime, pickupTimeSlot } = req.body;
     
     // Get the current request to track status changes
     const currentRequest = await DocumentRequest.findById(requestId).populate('user');
@@ -201,6 +202,18 @@ exports.updateRequestStatus = async (req, res) => {
       reviewedBy: req.user.userId,
       reviewedAt: new Date()
     };
+    
+    // If status is being set to approved, store pickup scheduling data
+    if (status === 'approved') {
+      if (pickupDateTime || pickupTimeSlot) {
+        updateData.pickupSchedule = {
+          scheduledDateTime: pickupDateTime ? new Date(pickupDateTime) : null,
+          timeSlot: pickupTimeSlot || null,
+          scheduledBy: req.user.userId,
+          scheduledAt: new Date()
+        };
+      }
+    }
     
     // If status is being set to completed, also set completedAt and auto-archive
     if (status === 'completed') {
@@ -225,6 +238,30 @@ exports.updateRequestStatus = async (req, res) => {
       updateData,
       { new: true }
     ).populate('user');
+    
+    // Generate pickup stub if status is approved and has pickup schedule
+    if (status === 'approved' && (pickupDateTime || pickupTimeSlot)) {
+      try {
+        console.log('Generating pickup stub for approved request:', requestId);
+        const stubResult = await pickupStubService.generatePickupStub(request);
+        
+        if (stubResult.success) {
+          // Update the request with pickup stub information
+          await DocumentRequest.findByIdAndUpdate(requestId, {
+            'pickupSchedule.qrCode': stubResult.qrCode,
+            'pickupSchedule.verificationCode': stubResult.verificationCode,
+            'pickupSchedule.stubPath': stubResult.filename
+          });
+          
+          console.log('Pickup stub generated successfully:', stubResult.filename);
+        } else {
+          console.error('Failed to generate pickup stub:', stubResult.error);
+        }
+      } catch (stubError) {
+        console.error('Error generating pickup stub:', stubError);
+        // Don't fail the approval process if stub generation fails
+      }
+    }
     
     // Send notification to user about status change
     if (oldStatus !== status) {
@@ -598,6 +635,255 @@ exports.bulkArchiveCompletedRequests = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Error archiving completed document requests',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// User: Download pickup stub (for approved requests)
+exports.downloadPickupStub = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const userId = req.user.userId;
+    
+    // Find request that belongs to the authenticated user and is approved
+    const request = await DocumentRequest.findOne({ 
+      _id: requestId, 
+      user: userId,
+      status: 'approved'
+    }).lean();
+    
+    if (!request) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Approved request not found or access denied' 
+      });
+    }
+    
+    if (!request.pickupSchedule?.stubPath) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Pickup stub not available for this request' 
+      });
+    }
+    
+    const stubPath = path.join(__dirname, '../uploads/pickup-stubs', request.pickupSchedule.stubPath);
+    
+    if (!fs.existsSync(stubPath)) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Pickup stub file not found' 
+      });
+    }
+    
+    // Determine content type based on file extension
+    const isHTML = request.pickupSchedule.stubPath.endsWith('.html');
+    const isPDF = request.pickupSchedule.stubPath.endsWith('.pdf');
+    
+    // Set headers for file download
+    if (isPDF) {
+      res.setHeader('Content-Type', 'application/pdf');
+    } else {
+      res.setHeader('Content-Type', 'text/html');
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${request.pickupSchedule.stubPath}"`);
+    
+    // Send the file
+    res.sendFile(stubPath);
+    
+  } catch (error) {
+    console.error('Error downloading pickup stub:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error downloading pickup stub',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Admin: Verify QR code for pickup
+exports.verifyPickupQR = async (req, res) => {
+  try {
+    const { qrData } = req.body;
+    
+    if (!qrData) {
+      return res.status(400).json({
+        success: false,
+        message: 'QR code data is required'
+      });
+    }
+    
+    // Verify QR code format
+    const verificationResult = pickupStubService.verifyPickupQR(qrData);
+    
+    if (!verificationResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verificationResult.message
+      });
+    }
+    
+    // Find the corresponding request
+    const request = await DocumentRequest.findOne({
+      _id: verificationResult.data.requestId,
+      status: 'approved'
+    }).populate('user', 'firstName lastName email');
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Request not found or not approved'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'QR code verified successfully',
+      requestData: {
+        id: request._id,
+        studentName: `${request.firstName || request.givenName} ${request.surname}`,
+        documentType: request.documentType,
+        pickupSchedule: request.pickupSchedule,
+        user: request.user
+      },
+      qrData: verificationResult.data
+    });
+    
+  } catch (error) {
+    console.error('Error verifying pickup QR:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error verifying QR code',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Admin: Mark document as picked up
+exports.markAsPickedUp = async (req, res) => {
+  try {
+    const { requestId } = req.params;
+    const { pickedUpBy, verificationCode } = req.body;
+    
+    const request = await DocumentRequest.findOne({
+      _id: requestId,
+      status: 'approved'
+    });
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Approved request not found'
+      });
+    }
+    
+    // Update pickup information
+    const updatedRequest = await DocumentRequest.findByIdAndUpdate(
+      requestId,
+      {
+        status: 'completed',
+        'pickupSchedule.pickedUpAt': new Date(),
+        'pickupSchedule.pickedUpBy': pickedUpBy || 'Unknown',
+        completedAt: new Date(),
+        archived: true,
+        archivedAt: new Date(),
+        archivedBy: req.user.email || 'Admin'
+      },
+      { new: true }
+    ).populate('user');
+    
+    res.json({
+      success: true,
+      message: 'Document marked as picked up and request completed',
+      request: updatedRequest
+    });
+    
+  } catch (error) {
+    console.error('Error marking as picked up:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Error marking document as picked up',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Admin: Verify QR code for pickup
+exports.verifyPickupQR = async (req, res) => {
+  try {
+    const { qrData } = req.body;
+    
+    if (!qrData || typeof qrData !== 'string') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid QR data provided'
+      });
+    }
+    
+    console.log('Verifying QR code data:', qrData);
+    
+    // Use pickup stub service to verify QR code
+    const pickupStubService = require('../utils/pickupStubService');
+    const verificationResult = await pickupStubService.verifyQRCode(qrData);
+    
+    if (!verificationResult.valid) {
+      return res.status(400).json({
+        success: false,
+        message: verificationResult.message || 'Invalid QR code'
+      });
+    }
+    
+    // Get the document request details
+    const request = await DocumentRequest.findById(verificationResult.requestId)
+      .populate('user');
+    
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Document request not found'
+      });
+    }
+    
+    // Check if already picked up
+    if (request.status === 'completed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Document has already been picked up'
+      });
+    }
+    
+    // Check if request is approved and ready for pickup
+    if (request.status !== 'approved') {
+      return res.status(400).json({
+        success: false,
+        message: 'Document is not ready for pickup'
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'QR code verified successfully',
+      qrData: verificationResult,
+      requestData: {
+        id: request._id,
+        studentName: request.studentName,
+        documentType: request.documentType,
+        purpose: request.purpose,
+        status: request.status,
+        submittedAt: request.submittedAt,
+        pickupSchedule: request.pickupSchedule,
+        user: {
+          email: request.user.email,
+          studentId: request.user.studentId
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Error verifying QR code:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error verifying QR code',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }

@@ -26,16 +26,12 @@ import {
 import {
   Send as SendIcon,
   CheckCircle as CheckIcon,
-  Description as DescriptionIcon,
   School as SchoolIcon,
   Assignment as AssignmentIcon,
   Info as InfoIcon,
-  Download as DownloadIcon,
   Login as LoginIcon,
   QrCode as QrCodeIcon,
 } from '@mui/icons-material';
-import { PDFDownloadLink, pdf } from '@react-pdf/renderer';
-import Form137RequestLetterPDF from '../../components/PDFTemplates/Form137RequestLetterPDF';
 import { DatePickerWrapper, DatePicker } from '../../components/DatePickerWrapper';
 import { documentService } from '../../services/api';
 import AIDocumentUploader from '../../components/AIDocumentUploader';
@@ -49,7 +45,7 @@ const Form137Request = () => {
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState({
-    documentType: 'Form 137',
+    documentType: 'form137',
     // Student Information
     surname: '',
     firstName: '',
@@ -78,7 +74,6 @@ const Form137Request = () => {
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [showAIUploader, setShowAIUploader] = useState(false);
-  const [generatedRequestLetter, setGeneratedRequestLetter] = useState(null);
 
   // AI Document Assistant handler
   // Accepts flat extractor_api output and maps to form fields
@@ -124,9 +119,9 @@ const Form137Request = () => {
   const requirements = [
     'Valid School ID or Any Valid Government ID',
     'Authorization Letter (if not the student)',
-    'Submit the generated request letter to the School Registrar',
-    'Wait for admin verification and approval',
-    'Collect your Form 137 upon notification',
+    'Wait for admin review and approval of your request',
+    'Check your dashboard for pickup date and time notification',
+    'Bring your pickup stub with QR code to collect your Form 137',
   ];
 
   const validateForm = () => {
@@ -174,16 +169,11 @@ const Form137Request = () => {
     try {
       console.log('Submitting Form 137 request:', formData);
       
-      // Submit the document request to the database
-      const response = await documentService.createRequest(formData);
-      console.log('Request submitted successfully:', response);
-      
-      // Generate request letter data for PDF download
-      const requestLetterData = {
+      // Submit the document request directly to the database
+      const requestData = {
         ...formData,
-        requestId: `FORM137-${Date.now()}`,
+        status: 'pending',
         submittedAt: new Date().toISOString(),
-        status: 'pending_verification',
         requestDate: new Date().toLocaleDateString('en-US', {
           year: 'numeric',
           month: 'long',
@@ -191,16 +181,15 @@ const Form137Request = () => {
         })
       };
       
-      // Automatically generate and download PDF
-      await generateAndDownloadPDF(requestLetterData);
+      const response = await documentService.createRequest(requestData);
+      console.log('Request submitted successfully:', response);
       
-      setGeneratedRequestLetter(requestLetterData);
       setShowSuccess(true);
       
       // Navigate to my requests page after a delay
       setTimeout(() => {
         navigate('/my-requests');
-      }, 4000);
+      }, 3000);
       
     } catch (error) {
       console.error('Request submission error:', error);
@@ -222,109 +211,8 @@ const Form137Request = () => {
     }
   };
 
-  // Function to automatically generate and download PDF
-  const generateAndDownloadPDF = async (requestLetterData) => {
-    try {
-      // Generate PDF blob
-      const pdfDoc = <Form137RequestLetterPDF requestData={requestLetterData} />;
-      const blob = await pdf(pdfDoc).toBlob();
-      
-      // Create download link
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `Form137_Request_${requestLetterData.requestId}.pdf`;
-      
-      // Trigger download
-      document.body.appendChild(link);
-      link.click();
-      
-      // Cleanup
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      
-      return true;
-    } catch (error) {
-      console.error('Error generating PDF:', error);
-      throw new Error('Failed to generate PDF');
-    }
-  };
-
   const renderFormContent = () => {
     try {
-      if (generatedRequestLetter) {
-        return (
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <Card variant="outlined" sx={{ backgroundColor: '#e8f5e8' }}>
-                <CardContent>
-                  <Box display="flex" alignItems="center" mb={2}>
-                    <CheckIcon color="success" sx={{ mr: 1 }} />
-                    <Typography variant="h6" color="success.main">
-                      Form 137 Request Submitted Successfully!
-                    </Typography>
-                  </Box>
-                  <Typography variant="body2" paragraph>
-                    <strong>Request ID:</strong> {generatedRequestLetter.requestId}
-                  </Typography>
-                  <Typography variant="body2" paragraph>
-                    <strong>Submitted Date:</strong> {generatedRequestLetter.requestDate}
-                  </Typography>
-                  <Typography variant="body2" paragraph>
-                    Your Form 137 request has been successfully submitted and is now being processed. 
-                    A copy of your request letter has been automatically downloaded to your device. You can track the status in your dashboard.
-                  </Typography>
-                  
-                  {/* Optional manual download button in case auto-download failed */}
-                  <Box mt={2}>
-                    <PDFDownloadLink
-                      document={<Form137RequestLetterPDF requestData={generatedRequestLetter} />}
-                      fileName={`Form137_Request_${generatedRequestLetter.requestId}.pdf`}
-                    >
-                      {({ loading }) => (
-                        <Button
-                          variant="outlined"
-                          color="primary"
-                          startIcon={loading ? <CircularProgress size={20} /> : <DownloadIcon />}
-                          disabled={loading}
-                          size="small"
-                        >
-                          {loading ? 'Generating PDF...' : 'Download Again'}
-                        </Button>
-                      )}
-                    </PDFDownloadLink>
-                  </Box>
-                </CardContent>
-              </Card>
-            </Grid>
-            
-            <Grid item xs={12}>
-              <Paper elevation={1} sx={{ p: 2, backgroundColor: '#fff3cd' }}>
-                <Typography variant="h6" gutterBottom color="warning.dark">
-                  Next Steps:
-                </Typography>
-                <List dense>
-                  {[
-                    'Submit this formal request letter to the School Registrar',
-                    'Bring required supporting documents (ID, authorization letter if applicable)',
-                    'Wait for admin verification of your request',
-                    'You will receive a collection stub once approved',
-                    'Present the collection stub to collect your Form 137'
-                  ].map((instruction, index) => (
-                    <ListItem key={index}>
-                      <ListItemIcon>
-                        <InfoIcon color="warning" fontSize="small" />
-                      </ListItemIcon>
-                      <ListItemText primary={instruction} />
-                    </ListItem>
-                  ))}
-                </List>
-              </Paper>
-            </Grid>
-          </Grid>
-        );
-      }
-
       return (
         <Grid container spacing={4}>
           {/* Student Information Section */}
@@ -633,11 +521,11 @@ const Form137Request = () => {
                 type="submit"
                 variant="contained"
                 disabled={loading || !isAuthenticated}
-                startIcon={loading ? <CircularProgress size={20} /> : <DescriptionIcon />}
+                startIcon={loading ? <CircularProgress size={20} /> : <SendIcon />}
                 size="large"
                 sx={{ minWidth: 200 }}
               >
-                {loading ? 'Generating Request Letter...' : 'Generate Request Letter'}
+                {loading ? 'Submitting Request...' : 'Submit Request'}
               </Button>
             </Box>
           </Grid>
@@ -667,10 +555,10 @@ const Form137Request = () => {
         {/* Header */}
         <Box sx={{ mb: 4 }}>
           <Typography variant="h4" component="h1" gutterBottom align="center" color="primary">
-            Form 137 / SF10 Request Intent Declaration
+            Form 137 / SF10 Request
           </Typography>
           <Typography variant="body1" color="text.secondary" align="center" paragraph>
-            Generate a pickup stub for your Form 137 / SF10 transfer request. This is a preparation document for the official school-to-school transfer process.
+            Submit your Form 137 / SF10 transfer request. Once approved by the admin, you will receive a pickup notification with date and time.
           </Typography>
         </Box>
 
@@ -678,7 +566,7 @@ const Form137Request = () => {
         {!isAuthenticated && (
           <Alert severity="warning" sx={{ mb: 3 }}>
             <Box display="flex" alignItems="center" justifyContent="space-between">
-              <Typography>Please log in to generate your Form 137 stub.</Typography>
+              <Typography>Please log in to submit your Form 137 request.</Typography>
               <Button
                 component={RouterLink}
                 to="/login"
@@ -700,7 +588,7 @@ const Form137Request = () => {
         {/* Requirements */}
         <Box sx={{ mt: 4 }}>
           <Typography variant="h6" gutterBottom>
-            Requirements for School Registrar Visit
+            Next Steps After Submission
           </Typography>
           <List>
             {requirements.map((req, index) => (
@@ -722,7 +610,7 @@ const Form137Request = () => {
           anchorOrigin={{ vertical: 'top', horizontal: 'center' }}
         >
           <Alert severity="success" onClose={() => setShowSuccess(false)}>
-            Form 137 request submitted successfully! You can track your request status in the dashboard.
+            Form 137 request submitted successfully! You can track your request status and pickup information in your dashboard.
           </Alert>
         </Snackbar>
 

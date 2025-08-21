@@ -26,6 +26,10 @@ import {
   Refresh as RefreshIcon,
   Download as DownloadIcon,
   AccountCircle as AccountCircleIcon,
+  Schedule as ScheduleIcon,
+  QrCode as QrCodeIcon,
+  Assignment as AssignmentIcon,
+  CheckCircle as CheckCircleIcon,
 } from '@mui/icons-material';
 import { documentService } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -41,7 +45,33 @@ const MyRequests = () => {
   const [selectedRequest, setSelectedRequest] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { user } = useAuth();
-  const navigate = useNavigate();  // Function to render PDF download component based on document type
+  const navigate = useNavigate();
+
+  // Function to download pickup stub for approved requests
+  const handleDownloadPickupStub = async (requestId) => {
+    try {
+      const response = await documentService.downloadPickupStub(requestId);
+      
+      // Create a blob from the response
+      const blob = new Blob([response.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      
+      // Create a temporary link to download the file
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `pickup_stub_${requestId.slice(-6)}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      
+      // Clean up
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      
+    } catch (error) {
+      console.error('Error downloading pickup stub:', error);
+      setError('Failed to download pickup stub. Please try again.');
+    }
+  };  // Function to render PDF download component based on document type
   const renderPDFDownload = (request) => {
     if (!request) return null;
 
@@ -263,6 +293,76 @@ const MyRequests = () => {
         </Button>
       </Box>
 
+      {/* Show Approved Requests with Pickup Info */}
+      {requests.filter(req => req.status === 'approved' && req.pickupSchedule).length > 0 && (
+        <Paper sx={{ p: 3, mb: 3, backgroundColor: '#f0f9ff', border: '1px solid #0ea5e9' }}>
+          <Typography variant="h6" sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2, color: 'primary.main' }}>
+            <CheckCircleIcon />
+            Approved Requests - Ready for Pickup
+          </Typography>
+          <Grid container spacing={2}>
+            {requests
+              .filter(req => req.status === 'approved' && req.pickupSchedule)
+              .map((request) => (
+                <Grid item xs={12} md={6} key={request._id}>
+                  <Box sx={{ 
+                    p: 2, 
+                    backgroundColor: 'white', 
+                    borderRadius: 2, 
+                    border: '1px solid #e0e0e0',
+                    '&:hover': { boxShadow: 2 }
+                  }}>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', mb: 1 }}>
+                      {request.documentType} - #{request._id?.slice(-6)}
+                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                      <ScheduleIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                      <Typography variant="body2">
+                        {request.pickupSchedule.scheduledDateTime 
+                          ? formatDate(request.pickupSchedule.scheduledDateTime)
+                          : 'Date pending'
+                        }
+                      </Typography>
+                    </Box>
+                    {request.pickupSchedule.timeSlot && (
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        Time: {request.pickupSchedule.timeSlot}
+                      </Typography>
+                    )}
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<ViewIcon />}
+                        onClick={() => handleViewDetails(request)}
+                      >
+                        Details
+                      </Button>
+                      {request.pickupSchedule && (request.pickupSchedule.stubPath || request.pickupSchedule.qrCode) && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<QrCodeIcon />}
+                          onClick={() => handleDownloadPickupStub(request._id)}
+                          sx={{
+                            background: 'linear-gradient(45deg, #4caf50, #66bb6a)',
+                            '&:hover': {
+                              background: 'linear-gradient(45deg, #66bb6a, #4caf50)',
+                            }
+                          }}
+                        >
+                          Download Pickup Stub
+                        </Button>
+                      )}
+                    </Box>
+                  </Box>
+                </Grid>
+              ))}
+          </Grid>
+        </Paper>
+      )}
+
       {requests.length === 0 ? (
         <Paper sx={{ p: 4, textAlign: 'center' }}>
           <Typography variant="h6" color="text.secondary" gutterBottom>
@@ -279,8 +379,8 @@ const MyRequests = () => {
               <TableRow sx={{ backgroundColor: 'primary.main' }}>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Request ID</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Document Type</TableCell>
-                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Purpose</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Status</TableCell>
+                <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Pickup Schedule</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Submitted Date</TableCell>
                 <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Actions</TableCell>
               </TableRow>
@@ -296,9 +396,6 @@ const MyRequests = () => {
                     #{request._id?.slice(-6) || request.id || `REQ-${index + 1}`}
                   </TableCell>
                   <TableCell>{request.documentType || 'N/A'}</TableCell>
-                  <TableCell sx={{ maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {request.purpose || 'N/A'}
-                  </TableCell>
                   <TableCell>
                     <Chip
                       label={request.status || 'Unknown'}
@@ -308,9 +405,38 @@ const MyRequests = () => {
                     />
                   </TableCell>
                   <TableCell>
+                    {request.status === 'approved' && request.pickupSchedule ? (
+                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                          <ScheduleIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                          <Typography variant="body2" sx={{ fontWeight: 'medium' }}>
+                            {request.pickupSchedule.scheduledDateTime 
+                              ? formatDate(request.pickupSchedule.scheduledDateTime)
+                              : 'Date not set'
+                            }
+                          </Typography>
+                        </Box>
+                        {request.pickupSchedule.timeSlot && (
+                          <Typography variant="caption" color="text.secondary">
+                            {request.pickupSchedule.timeSlot}
+                          </Typography>
+                        )}
+                      </Box>
+                    ) : request.status === 'approved' ? (
+                      <Typography variant="body2" color="text.secondary">
+                        Schedule pending
+                      </Typography>
+                    ) : (
+                      <Typography variant="body2" color="text.secondary">
+                        Not scheduled
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     {formatDate(request.submittedAt || request.createdAt)}
-                  </TableCell>                  <TableCell>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                  </TableCell>
+                  <TableCell>
+                    <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
                       <Button
                         size="small"
                         variant="outlined"
@@ -319,6 +445,17 @@ const MyRequests = () => {
                       >
                         View
                       </Button>
+                      {request.status === 'approved' && request.pickupSchedule && (request.pickupSchedule.stubPath || request.pickupSchedule.qrCode) && (
+                        <Button
+                          size="small"
+                          variant="contained"
+                          color="success"
+                          startIcon={<QrCodeIcon />}
+                          onClick={() => handleDownloadPickupStub(request._id)}
+                        >
+                          Pickup Stub
+                        </Button>
+                      )}
                       {renderPDFDownload(request)}
                     </Box>
                   </TableCell>
@@ -453,6 +590,92 @@ const MyRequests = () => {
                 </>
               )}
 
+              {/* Pickup Schedule Information for Approved Requests */}
+              {selectedRequest.status === 'approved' && selectedRequest.pickupSchedule && (
+                <>
+                  <Grid item xs={12}>
+                    <Divider sx={{ my: 1 }} />
+                    <Typography variant="h6" color="primary.main" sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <ScheduleIcon />
+                      Pickup Schedule Information
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Scheduled Date:
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                      {selectedRequest.pickupSchedule.scheduledDateTime 
+                        ? formatDate(selectedRequest.pickupSchedule.scheduledDateTime)
+                        : 'Not specified'
+                      }
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Time Slot:
+                    </Typography>
+                    <Typography variant="body1" sx={{ fontWeight: 'medium' }}>
+                      {selectedRequest.pickupSchedule.timeSlot || 'Not specified'}
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Pickup Instructions:
+                    </Typography>
+                    <Box sx={{ 
+                      backgroundColor: '#e3f2fd',
+                      border: '1px solid #90caf9',
+                      borderRadius: 2,
+                      p: 2,
+                      mt: 1
+                    }}>
+                      <Typography variant="body2" component="div">
+                        <strong>📋 What to bring:</strong>
+                        <ul style={{ margin: '8px 0', paddingLeft: '20px' }}>
+                          <li>Valid ID (School ID or Government-issued ID)</li>
+                          <li>Your printed pickup stub with QR code</li>
+                          <li>Authorization letter (if someone else will pick up)</li>
+                        </ul>
+                        <strong>🕒 Pickup Location:</strong> Registrar's Office<br/>
+                        <strong>💡 Note:</strong> Please arrive during your scheduled time slot to avoid delays.
+                      </Typography>
+                    </Box>
+                  </Grid>
+                  {selectedRequest.pickupSchedule && (selectedRequest.pickupSchedule.stubPath || selectedRequest.pickupSchedule.qrCode) && (
+                    <Grid item xs={12}>
+                      <Box sx={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        gap: 2,
+                        p: 2,
+                        backgroundColor: '#f0f9ff',
+                        border: '1px dashed #0ea5e9',
+                        borderRadius: 2
+                      }}>
+                        <QrCodeIcon sx={{ fontSize: 32, color: 'primary.main' }} />
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle2" color="primary.main" sx={{ fontWeight: 'bold' }}>
+                            Pickup Stub Available
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            Download your pickup stub with QR code for verification at the registrar's office.
+                          </Typography>
+                        </Box>
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          startIcon={<DownloadIcon />}
+                          onClick={() => handleDownloadPickupStub(selectedRequest._id)}
+                        >
+                          Download Stub
+                        </Button>
+                      </Box>
+                    </Grid>
+                  )}
+                </>
+              )}
+
               {/* Pickup Information */}
               {(selectedRequest.preferredPickupDate || selectedRequest.preferredPickupTime) && (
                 <>
@@ -531,7 +754,17 @@ const MyRequests = () => {
           )}
         </DialogContent>        <DialogActions>
           <Box sx={{ display: 'flex', gap: 2, width: '100%', justifyContent: 'space-between' }}>
-            <Box>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {selectedRequest && selectedRequest.status === 'approved' && selectedRequest.pickupSchedule && (selectedRequest.pickupSchedule.stubPath || selectedRequest.pickupSchedule.qrCode) && (
+                <Button
+                  variant="contained"
+                  color="primary"
+                  startIcon={<QrCodeIcon />}
+                  onClick={() => handleDownloadPickupStub(selectedRequest._id)}
+                >
+                  Download Pickup Stub
+                </Button>
+              )}
               {selectedRequest && renderPDFDownload(selectedRequest)}
             </Box>
             <Button onClick={handleCloseDialog}>Close</Button>
