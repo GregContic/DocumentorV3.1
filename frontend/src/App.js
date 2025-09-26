@@ -15,6 +15,7 @@ import DocumentRequest from './components/DocumentDashboard';
 import MyRequests from './pages/user/MyRequests';
 import UserInquiriesDashboard from './components/UserInquiriesDashboard';
 import UserForm137Dashboard from './user/UserForm137Dashboard';
+import UserForm138Dashboard from './user/UserForm138Dashboard';
 import UserRequestHistoryDashboard from './user/UserRequestHistoryDashboard';
 import Form137Request from './pages/user/Form137Request';
 import Form138Request from './pages/user/Form138Request';
@@ -27,6 +28,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import Archive from './admin/Archive';
 import EnrollmentDashboard from './admin/EnrollmentDashboard';
 import Form137StubDashboard from './admin/Form137StubDashboard';
+import Form138StubDashboard from './admin/Form138StubDashboard';
 import AdminRequestDashboard from './admin/AdminRequestDashboard';
 import InquiriesDashboard from './admin/InquiriesDashboard';
 import Settings from './admin/Settings';
@@ -149,6 +151,14 @@ function App() {
               }
             />
             <Route
+              path="/my-form138-requests"
+              element={
+                <ProtectedRoute>
+                  <UserForm138Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/my-requests-history"
               element={
                 <ProtectedRoute>
@@ -251,7 +261,15 @@ function App() {
               path="/admin/form137-stubs"
               element={
                 <ProtectedRoute requireAdmin={true}>
-                  <AdminRequestDashboard />
+                  <Form137StubDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/form138-stubs"
+              element={
+                <ProtectedRoute requireAdmin={true}>
+                  <Form138StubDashboard />
                 </ProtectedRoute>
               }
             />

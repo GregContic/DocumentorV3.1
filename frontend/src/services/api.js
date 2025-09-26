@@ -170,6 +170,17 @@ export const form137StubService = {
   verifyStubByCode: (stubCode) => api.get(`/api/form137-stubs/verify/${stubCode}`),
 };
 
+// Form 138 Stub service
+export const form138StubService = {
+  createStub: (stubData) => api.post('/api/form138-stubs/create', stubData),
+  getUserStubs: () => api.get('/api/form138-stubs/my-stubs'),
+  getStubById: (id) => api.get(`/api/form138-stubs/${id}`),
+  // Admin methods
+  getAllStubs: (params) => api.get('/api/form138-stubs', { params }),
+  updateStubStatus: (id, statusData) => api.put(`/api/form138-stubs/${id}/status`, statusData),
+  verifyStubByCode: (stubCode) => api.get(`/api/form138-stubs/verify/${stubCode}`),
+};
+
 // Chatbot service
 export const chatbotService = {
   sendMessage: (message, pageContext) => api.post('/api/chatbot/message', { message, pageContext }),

@@ -46,6 +46,18 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
           description: 'Manage document requests'
         },
         {
+          text: 'Form 137 Stubs',
+          icon: <DocumentIcon />,
+          path: '/admin/form137-stubs',
+          description: 'Manage Form 137 request stubs'
+        },
+        {
+          text: 'Form 138 Stubs',
+          icon: <DocumentIcon />,
+          path: '/admin/form138-stubs',
+          description: 'Manage Form 138 request stubs'
+        },
+        {
           text: 'Enrollment Management',
           icon: <EnrollmentIcon />,
           path: '/admin/enrollments',
@@ -71,6 +83,18 @@ const AdminSidebar = ({ open, onClose, variant = 'permanent' }) => {
           icon: <DocumentIcon />,
           path: '/admin/documents',
           description: 'Manage document requests'
+        },
+        {
+          text: 'Form 137 Stubs',
+          icon: <DocumentIcon />,
+          path: '/admin/form137-stubs',
+          description: 'Manage Form 137 request stubs'
+        },
+        {
+          text: 'Form 138 Stubs',
+          icon: <DocumentIcon />,
+          path: '/admin/form138-stubs',
+          description: 'Manage Form 138 request stubs'
         },
         {
           text: 'Inquiries',

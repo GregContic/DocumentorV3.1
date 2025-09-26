@@ -262,12 +262,150 @@ const Enrollment = () => {
   ];
 
   // File upload handler
+  // Upload file and optionally run OCR extraction to autofill fields
+  const extractAndAutofill = async (file, field) => {
+    if (!file) return;
+    setAIExtracting(true);
+    try {
+      const form = new FormData();
+      form.append('document', file);
+
+      // POST to extraction API (same endpoint used by AIDocumentUploader)
+      const resp = await fetch('http://localhost:5001/api/extract-pdf', {
+        method: 'POST',
+        body: form,
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text();
+        console.warn('OCR extraction failed:', resp.status, text);
+        setErrorMessage('Document extraction failed. Please try again or use the AI uploader.');
+        setShowError(true);
+        return;
+      }
+
+      const extracted = await resp.json();
+
+      // Debug: log full extractor response so developer can inspect why fields weren't mapped
+      console.debug('OCR extractor response:', extracted);
+
+      // If extractor returned no meaningful structured fields, try a client-side raw-text fallback
+      const hasStructured = (extracted && (extracted.surname || extracted.firstName || extracted.learnerReferenceNumber || extracted.dateOfBirth));
+      if (!hasStructured) {
+        const raw = (extracted && (extracted.rawText || extracted.text)) || '';
+
+        // Simple heuristics to pull LRN (12 digits), date patterns, and probable full name from raw text
+        const heuristics = {};
+
+        // LRN: 12 consecutive digits
+        const lrnMatch = raw.match(/\b\d{12}\b/);
+        if (lrnMatch) heuristics.learnerReferenceNumber = lrnMatch[0];
+
+        // Date: match common date formats (e.g., 25/11/2004, 11-25-2004, November 25, 2004)
+        const dateMatch = raw.match(/\b(?:\d{1,2}[\/-]\d{1,2}[\/-]\d{2,4}|(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4})\b/i);
+        if (dateMatch) heuristics.dateOfBirth = dateMatch[0];
+
+        // Name: look for lines with 2-4 words, each starting with uppercase, length heuristics
+        const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        for (const line of lines) {
+          // skip lines containing common keywords
+          if (/birth|school|certificate|address|date|lrn|student|sex|grade|subject/i.test(line)) continue;
+          const words = line.split(/\s+/);
+          const properWords = words.filter(w => /^[A-Z][a-zA-Z'-]{2,}$/.test(w));
+          if (properWords.length >= 2 && properWords.length <= 4) {
+            heuristics.fullName = properWords.join(' ');
+            break;
+          }
+        }
+
+        // If heuristics found anything, merge into form and return early
+        if (Object.keys(heuristics).length > 0) {
+          console.debug('Applying client-side heuristics from raw text:', heuristics);
+          setFormData(prev => ({
+            ...prev,
+            learnerReferenceNumber: heuristics.learnerReferenceNumber || prev.learnerReferenceNumber,
+            surname: heuristics.fullName ? heuristics.fullName.split(' ').slice(-1).join(' ') : prev.surname,
+            firstName: heuristics.fullName ? heuristics.fullName.split(' ')[0] : prev.firstName,
+            middleName: heuristics.fullName && heuristics.fullName.split(' ').length > 2 ? heuristics.fullName.split(' ').slice(1, -1).join(' ') : prev.middleName,
+            dateOfBirth: heuristics.dateOfBirth ? new Date(heuristics.dateOfBirth) : prev.dateOfBirth,
+          }));
+          setShowSuccess(true);
+          // still show debug info in console for developer
+          console.debug('Raw-text autofill applied. If fields are incorrect, please edit them manually.');
+        } else {
+          // No heuristics possible - fallback to debug endpoint for more clues
+          try {
+            const debugForm = new FormData();
+            debugForm.append('document', file);
+            const debugResp = await fetch('http://localhost:5001/api/extract-debug', {
+              method: 'POST',
+              body: debugForm,
+            });
+            if (debugResp.ok) {
+              const debugJson = await debugResp.json();
+              console.debug('OCR debug response:', debugJson);
+              const preview = debugJson.corrected_text_preview || debugJson.raw_text_preview || '';
+              setErrorMessage('Extraction returned no structured fields. Debug preview: ' + (preview.slice ? preview.slice(0, 300) : preview));
+              setShowError(true);
+            } else {
+              setErrorMessage('Extraction returned no structured fields. Enable backend debug to inspect the document.');
+              setShowError(true);
+            }
+          } catch (debugErr) {
+            console.error('Error fetching extraction debug info:', debugErr);
+            setErrorMessage('Extraction returned no structured fields and debug call failed. Check backend logs.');
+            setShowError(true);
+          }
+        }
+      }
+
+      // Merge extracted fields into the form while preserving existing values
+      setFormData(prev => {
+        const updated = {
+          ...prev,
+          [field]: file,
+          [field.replace('File', '')]: !!file,
+          learnerReferenceNumber: extracted.learnerReferenceNumber || prev.learnerReferenceNumber,
+          surname: extracted.surname || prev.surname,
+          firstName: extracted.firstName || prev.firstName,
+          middleName: extracted.middleName || prev.middleName,
+          dateOfBirth: extracted.dateOfBirth ? new Date(extracted.dateOfBirth) : prev.dateOfBirth,
+          placeOfBirth: extracted.placeOfBirth || prev.placeOfBirth,
+          sex: extracted.sex || prev.sex,
+          citizenship: extracted.citizenship || prev.citizenship || 'Filipino',
+          fatherName: extracted.father || prev.fatherName,
+          motherName: extracted.mother || prev.motherName,
+        };
+
+        return updated;
+      });
+
+      setShowSuccess(true);
+    } catch (err) {
+      console.error('Error extracting document:', err);
+      setErrorMessage('Error extracting document. Please try again.');
+      setShowError(true);
+    } finally {
+      setAIExtracting(false);
+    }
+  };
+
   const handleFileUpload = (field, file) => {
+    // Always set the file in form state
     setFormData(prev => ({
       ...prev,
       [field]: file,
       [field.replace('File', '')]: !!file
     }));
+
+    // If a valid file was provided, attempt OCR extraction in background
+    if (file) {
+      const isLikelyDocument = (file.type === 'application/pdf' || (file.type && file.type.startsWith('image/')) || /\.(pdf|jpe?g|png|bmp|tiff)$/i.test(file.name || ''));
+      if (isLikelyDocument) {
+        // Fire-and-forget but keep UI state
+        extractAndAutofill(file, field);
+      }
+    }
   };
 
   const validateStep = (stepIndex) => {

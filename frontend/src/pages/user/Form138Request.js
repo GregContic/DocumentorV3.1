@@ -38,14 +38,13 @@ import {
 import { PDFDownloadLink } from '@react-pdf/renderer';
 import Form138RequestLetterPDF from '../../components/PDFTemplates/Form138RequestLetterPDF';
 import { DatePickerWrapper, DatePicker } from '../../components/DatePickerWrapper';
-import { documentService } from '../../services/api';
+import { form138StubService } from '../../services/api';
 import AIDocumentUploader from '../../components/AIDocumentUploader';
 import AIAssistantCard from '../../components/AIAssistantCard';
 import { useAuth } from '../../context/AuthContext';
 import { Link as RouterLink, useNavigate } from 'react-router-dom';
 
 const Form138Request = () => {
-  const [activeStep, setActiveStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const { user, isAuthenticated } = useAuth();
   const navigate = useNavigate();
@@ -127,59 +126,34 @@ const Form138Request = () => {
   const requirements = [
     'Valid School ID or Any Valid Government ID',
     'Authorization Letter (if not the student)',
-    'Submit the generated request letter to the School Registrar',
-    'Wait for admin verification and approval',
+    'Submit the generated request stub to the School Registrar',
+    'Wait for registrar verification and approval',
     'Collect your Form 138 upon notification',
   ];
 
-  const steps = ['Student Information', 'Academic Details', 'Parent/Guardian Info', 'Generate Request Letter'];
-
-  const validateStep = (stepIndex) => {
+  const validateForm = () => {
     const newErrors = {};
 
-    switch (stepIndex) {
-      case 0: // Student Information
-        if (!formData.surname.trim()) newErrors.surname = 'Surname is required';
-        if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-        if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
-        if (!formData.sex) newErrors.sex = 'Sex is required';
-        if (!formData.barangay.trim()) newErrors.barangay = 'Barangay is required';
-        if (!formData.city.trim()) newErrors.city = 'City/Municipality is required';
-        if (!formData.province.trim()) newErrors.province = 'Province is required';
-        break;
-      case 1: // Academic Details
-        if (!formData.gradeLevel.trim()) newErrors.gradeLevel = 'Grade level is required';
-        if (!formData.schoolYear.trim()) newErrors.schoolYear = 'School year is required';
-        if (!formData.purpose.trim()) newErrors.purpose = 'Purpose is required';
-        break;
-      case 2: // Parent/Guardian Information
-        if (!formData.parentName.trim()) newErrors.parentName = 'Parent/Guardian name is required';
-        if (!formData.parentAddress.trim()) newErrors.parentAddress = 'Parent/Guardian address is required';
-        break;
-      default:
-        break;
-    }
+    // Student Information
+    if (!formData.surname.trim()) newErrors.surname = 'Surname is required';
+    if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
+    if (!formData.dateOfBirth) newErrors.dateOfBirth = 'Date of birth is required';
+    if (!formData.sex) newErrors.sex = 'Sex is required';
+    if (!formData.barangay.trim()) newErrors.barangay = 'Barangay is required';
+    if (!formData.city.trim()) newErrors.city = 'City/Municipality is required';
+    if (!formData.province.trim()) newErrors.province = 'Province is required';
+    
+    // Academic Details
+    if (!formData.gradeLevel.trim()) newErrors.gradeLevel = 'Grade level is required';
+    if (!formData.schoolYear.trim()) newErrors.schoolYear = 'School year is required';
+    if (!formData.purpose.trim()) newErrors.purpose = 'Purpose is required';
+    
+    // Parent/Guardian Information
+    if (!formData.parentName.trim()) newErrors.parentName = 'Parent/Guardian name is required';
+    if (!formData.parentAddress.trim()) newErrors.parentAddress = 'Parent/Guardian address is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  };
-
-  const handleNext = () => {
-    try {
-      const isValid = validateStep(activeStep);
-      
-      if (isValid) {
-        setActiveStep((prev) => prev + 1);
-      }
-    } catch (error) {
-      console.error('Error in handleNext:', error);
-      setErrorMessage('An error occurred while proceeding to the next step.');
-      setShowError(true);
-    }
-  };
-
-  const handleBack = () => {
-    setActiveStep((prev) => prev - 1);
   };
 
   const handleFormSubmit = (e) => {
@@ -187,7 +161,7 @@ const Form138Request = () => {
   };
 
   const handleSubmit = async () => {
-    if (!validateStep(activeStep)) return;
+    if (!validateForm()) return;
 
     // Check authentication before submitting
     if (!isAuthenticated) {
@@ -198,31 +172,32 @@ const Form138Request = () => {
 
     setLoading(true);
     try {
-      console.log('Submitting Form 138 request:', formData);
+      console.log('Submitting Form 138 stub request:', formData);
       
-      // Submit the document request to the database
-      const response = await documentService.createRequest(formData);
-      console.log('Request submitted successfully:', response);
+      // Submit the Form 138 stub request
+      const response = await form138StubService.createStub(formData);
+      console.log('Form 138 stub created successfully:', response);
       
-      // Also generate request letter data for PDF download
+      // Use the created stub data for the request letter
       const requestLetterData = {
         ...formData,
-        requestId: `FORM138-${Date.now()}`,
+        requestId: response.data.data.stubCode,
+        stubCode: response.data.data.stubCode,
+        qrCode: response.data.data.qrCode,
         submittedAt: new Date().toISOString(),
-        status: 'pending_verification'
+        status: 'stub-generated'
       };
       
       setGeneratedRequestLetter(requestLetterData);
       setShowSuccess(true);
-      setActiveStep(activeStep + 1); // Move to final step showing the letter
       
       // Navigate to my requests page after a delay
       setTimeout(() => {
-        navigate('/my-requests');
+        navigate('/my-form138-requests');
       }, 3000);
       
     } catch (error) {
-      console.error('Request submission error:', error);
+      console.error('Form 138 stub creation error:', error);
       
       // More detailed error handling
       let errorMsg = 'Failed to submit Form 138 request. Please try again.';
@@ -243,42 +218,107 @@ const Form138Request = () => {
     }
   };
 
-  const renderStepContent = (step) => {
-    try {
-      switch (step) {
-        case 0: // Student Information
-          return (
+  const renderFormContent = () => {
+    if (generatedRequestLetter) {
+      return (
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Card variant="outlined" sx={{ backgroundColor: '#e8f5e8' }}>
+              <CardContent>
+                <Box display="flex" alignItems="center" mb={2}>
+                  <DescriptionIcon color="success" sx={{ mr: 1 }} />
+                  <Typography variant="h6" color="success.main">
+                    Form 138 Stub Generated Successfully!
+                  </Typography>
+                </Box>
+                <Typography variant="body2" paragraph>
+                  <strong>Stub Code:</strong> {generatedRequestLetter.stubCode}
+                </Typography>
+                <Typography variant="body2" paragraph>
+                  Your Form 138 request stub has been successfully generated. This stub contains a QR code that allows you to track your request and will be used for pickup verification. You can download a copy of your request stub below and track the status in your dashboard.
+                </Typography>
+                
+                {generatedRequestLetter && (
+                  <Box mt={2}>
+                    <PDFDownloadLink
+                      document={<Form138RequestLetterPDF requestData={generatedRequestLetter} />}
+                      fileName={`Form138_Stub_${generatedRequestLetter.stubCode}.pdf`}
+                    >
+                      {({ loading }) => (
+                        <Button
+                          variant="contained"
+                          color="primary"
+                          startIcon={loading ? <CircularProgress size={20} /> : <DownloadIcon />}
+                          disabled={loading}
+                          size="large"
+                        >
+                          {loading ? 'Generating PDF...' : 'Download Request Stub'}
+                        </Button>
+                      )}
+                    </PDFDownloadLink>
+                  </Box>
+                )}
+              </CardContent>
+            </Card>
+          </Grid>
+          
+          <Grid item xs={12}>
+            <Paper elevation={1} sx={{ p: 2, backgroundColor: '#fff3cd' }}>
+              <Typography variant="h6" gutterBottom color="warning.dark">
+                Next Steps:
+              </Typography>
+              <List dense>
+                {[
+                  'Submit this formal request stub to the School Registrar',
+                  'Bring required supporting documents (ID, authorization letter if applicable)',
+                  'Wait for registrar verification of your request',
+                  'You will receive a notification when your Form 138 is ready for pickup',
+                  'Present this stub and its QR code to collect your Form 138'
+                ].map((instruction, index) => (
+                  <ListItem key={index}>
+                    <ListItemIcon>
+                      <InfoIcon color="warning" fontSize="small" />
+                    </ListItemIcon>
+                    <ListItemText primary={instruction} />
+                  </ListItem>
+                ))}
+              </List>
+            </Paper>
+          </Grid>
+        </Grid>
+      );
+    }
+
+    return (
+      <Grid container spacing={4}>
+        {/* AI Assistant Card */}
+        <Grid item xs={12}>
+          <AIAssistantCard
+            title="AI Document Assistant"
+            description="Upload a document image to automatically extract student information"
+            show={!showAIUploader}
+            onStartAIProcessing={() => setShowAIUploader(true)}
+          />
+        </Grid>
+        
+        {/* AI Document Uploader */}
+        {showAIUploader && (
+          <Grid item xs={12}>
+            <AIDocumentUploader
+              formData={formData}
+              setFormData={setFormData}
+              onDataExtracted={handleAIDataExtracted}
+            />
+          </Grid>
+        )}
+
+        {/* Student Information Section */}
+        <Grid item xs={12}>
+          <Typography variant="h6" gutterBottom color="primary">
+            Student Information
+          </Typography>
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Student Information
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Fill out the student's personal information below. You can use our AI assistant to automatically extract information from document images.
-                </Typography>
-              </Grid>
-
-              {/* AI Assistant Card */}
-              <Grid item xs={12}>
-                <AIAssistantCard
-                  title="AI Document Assistant"
-                  description="Upload a document image to automatically extract student information"
-                  show={!showAIUploader}
-                  onStartAIProcessing={() => setShowAIUploader(true)}
-                />
-              </Grid>
-              
-              {/* AI Document Uploader */}
-              {showAIUploader && (
-                <Grid item xs={12}>
-                  <AIDocumentUploader
-                    formData={formData}
-                    setFormData={setFormData}
-                    onDataExtracted={handleAIDataExtracted}
-                  />
-                </Grid>
-              )}
-
               {/* Name Fields */}
               <Grid item xs={12} md={4}>
                 <TextField
@@ -397,20 +437,16 @@ const Form138Request = () => {
                 />
               </Grid>
             </Grid>
-          );
+          </Paper>
+        </Grid>
 
-        case 1: // Academic Details
-          return (
+        {/* Academic Information Section */}
+        <Grid item xs={12}>
+          <Typography variant="h6" gutterBottom color="primary">
+            Academic Information
+          </Typography>
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Academic Information
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Provide details about your academic information for the Form 138 request.
-                </Typography>
-              </Grid>
-
               <Grid item xs={12} md={6}>
                 <FormControl fullWidth required error={!!errors.gradeLevel}>
                   <InputLabel>Grade Level</InputLabel>
@@ -491,20 +527,16 @@ const Form138Request = () => {
                 </FormControl>
               </Grid>
             </Grid>
-          );
+          </Paper>
+        </Grid>
 
-        case 2: // Parent/Guardian Information
-          return (
+        {/* Parent/Guardian Information Section */}
+        <Grid item xs={12}>
+          <Typography variant="h6" gutterBottom color="primary">
+            Parent/Guardian Information
+          </Typography>
+          <Paper elevation={1} sx={{ p: 3, mb: 3 }}>
             <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Parent/Guardian Information
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Provide contact information for your parent or guardian.
-                </Typography>
-              </Grid>
-
               <Grid item xs={12}>
                 <TextField
                   fullWidth
@@ -541,133 +573,26 @@ const Form138Request = () => {
                 />
               </Grid>
             </Grid>
-          );
+          </Paper>
+        </Grid>
 
-        case 3: // Generate Request Letter
-          return (
-            <Grid container spacing={3}>
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Generate Form 138 Request Letter
-                </Typography>
-                <Typography variant="body2" color="text.secondary" gutterBottom>
-                  Review your information and generate your formal Form 138 request letter.
-                </Typography>
-              </Grid>
-              
-              {!generatedRequestLetter ? (
-                <Grid item xs={12}>
-                  <Card variant="outlined">
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
-                        Review Your Information
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>Student:</strong> {formData.firstName} {formData.middleName} {formData.surname}
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>LRN:</strong> {formData.lrn || 'N/A'}
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>Grade Level:</strong> {formData.gradeLevel} ({formData.schoolYear})
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>Section:</strong> {formData.section || 'N/A'}
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>Purpose:</strong> {formData.purpose}
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        <strong>Parent/Guardian:</strong> {formData.parentName}
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ) : (
-                <Grid item xs={12}>
-                  <Card variant="outlined" sx={{ backgroundColor: '#e8f5e8' }}>
-                    <CardContent>
-                      <Box display="flex" alignItems="center" mb={2}>
-                        <DescriptionIcon color="success" sx={{ mr: 1 }} />
-                        <Typography variant="h6" color="success.main">
-                          Request Letter Generated Successfully!
-                        </Typography>
-                      </Box>
-                      <Typography variant="body2" paragraph>
-                        <strong>Request ID:</strong> {generatedRequestLetter.requestId}
-                      </Typography>
-                      <Typography variant="body2" paragraph>
-                        Your Form 138 request has been successfully submitted and is now being processed. You can download a copy of your request letter below and track the status in your dashboard.
-                      </Typography>
-                      
-                      {generatedRequestLetter && (
-                        <Box mt={2}>
-                          <PDFDownloadLink
-                            document={<Form138RequestLetterPDF requestData={generatedRequestLetter} />}
-                            fileName={`Form138_Request_${generatedRequestLetter.requestId}.pdf`}
-                          >
-                            {({ loading }) => (
-                              <Button
-                                variant="contained"
-                                color="primary"
-                                startIcon={loading ? <CircularProgress size={20} /> : <DownloadIcon />}
-                                disabled={loading}
-                                size="large"
-                              >
-                                {loading ? 'Generating PDF...' : 'Download Request Letter'}
-                              </Button>
-                            )}
-                          </PDFDownloadLink>
-                        </Box>
-                      )}
-                    </CardContent>
-                  </Card>
-                </Grid>
-              )}
-              
-              <Grid item xs={12}>
-                <Paper elevation={1} sx={{ p: 2, backgroundColor: '#fff3cd' }}>
-                  <Typography variant="h6" gutterBottom color="warning.dark">
-                    Next Steps:
-                  </Typography>
-                  <List dense>
-                    {[
-                      'Submit this formal request letter to the School Registrar',
-                      'Bring required supporting documents (ID, authorization letter if applicable)',
-                      'Wait for admin verification of your request',
-                      'You will receive a collection stub once approved',
-                      'Present the collection stub to collect your Form 138'
-                    ].map((instruction, index) => (
-                      <ListItem key={index}>
-                        <ListItemIcon>
-                          <InfoIcon color="warning" fontSize="small" />
-                        </ListItemIcon>
-                        <ListItemText primary={instruction} />
-                      </ListItem>
-                    ))}
-                  </List>
-                </Paper>
-              </Grid>
-            </Grid>
-          );
-
-        default:
-          return 'Unknown step';
-      }
-    } catch (error) {
-      console.error('Error rendering step content:', error);
-      return (
-        <Alert severity="error">
-          An error occurred while loading this step. Please try refreshing the page.
-        </Alert>
-      );
-    }
-  };
-
-  const getStepIcon = (index) => {
-    const icons = [AssignmentIcon, SchoolIcon, DescriptionIcon, CheckIcon];
-    const IconComponent = icons[index] || AssignmentIcon;
-    return <IconComponent />;
+        {/* Submit Button */}
+        <Grid item xs={12}>
+          <Box display="flex" justifyContent="center" mt={3}>
+            <Button
+              onClick={handleSubmit}
+              variant="contained"
+              size="large"
+              disabled={loading || !isAuthenticated}
+              startIcon={loading ? <CircularProgress size={20} /> : <DescriptionIcon />}
+              sx={{ minWidth: 200 }}
+            >
+              {loading ? 'Generating Request Stub...' : 'Generate Request Stub'}
+            </Button>
+          </Box>
+        </Grid>
+      </Grid>
+    );
   };
 
   if (!isAuthenticated) {
@@ -697,61 +622,19 @@ const Form138Request = () => {
   }
 
   return (
-    <Container maxWidth="md" sx={{ mt: 4, mb: 4 }}>
+    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
       <Paper elevation={3} sx={{ p: 4 }}>
         <Typography variant="h4" gutterBottom align="center">
           Form 138 (Report Card) Request
         </Typography>
         <Typography variant="body1" color="text.secondary" align="center" gutterBottom>
-          Generate a formal request letter for your Form 138 (Report Card)
+          Complete all sections below to generate your Form 138 request stub
         </Typography>
-
-        <Box sx={{ mb: 4 }}>
-          <Stepper activeStep={activeStep} alternativeLabel>
-            {steps.map((label, index) => (
-              <Step key={label}>
-                <StepLabel icon={getStepIcon(index)}>{label}</StepLabel>
-              </Step>
-            ))}
-          </Stepper>
-        </Box>
 
         <Box sx={{ mt: 4 }}>
           <form onSubmit={handleFormSubmit}>
-            {renderStepContent(activeStep)}
+            {renderFormContent()}
           </form>
-          
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 3 }}>
-            <Button
-              onClick={handleBack}
-              disabled={activeStep === 0 || loading}
-            >
-              Back
-            </Button>
-            
-            <Box>
-              {activeStep === steps.length - 1 ? (
-                !generatedRequestLetter && (
-                  <Button
-                    onClick={handleSubmit}
-                    variant="contained"
-                    disabled={loading || !isAuthenticated}
-                    startIcon={loading ? <CircularProgress size={20} /> : <DescriptionIcon />}
-                  >
-                    {loading ? 'Generating Request Letter...' : 'Generate Request Letter'}
-                  </Button>
-                )
-              ) : (
-                <Button
-                  onClick={handleNext}
-                  variant="contained"
-                  disabled={loading}
-                >
-                  Next
-                </Button>
-              )}
-            </Box>
-          </Box>
         </Box>
 
         {/* Requirements Section */}
@@ -781,7 +664,7 @@ const Form138Request = () => {
         onClose={() => setShowSuccess(false)}
       >
         <Alert onClose={() => setShowSuccess(false)} severity="success">
-          Form 138 request letter generated successfully!
+          Form 138 request stub generated successfully!
         </Alert>
       </Snackbar>
 

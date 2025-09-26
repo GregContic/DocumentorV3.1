@@ -226,10 +226,12 @@ const Navbar = () => {
   );
 
   // For desktop/top-nav: hide the 'Enrollment' button on selected public pages (home, login)
-  const hideEnrollmentOn = ['/', '/login'];
-  const desktopNavItems = navItems.filter(
+  const hideEnrollmentOn = ['/', '/login', '/register'];
+  // Filter nav items used by both desktop nav and mobile drawer so Enrollment can be hidden on specific pages
+  const filteredNavItems = navItems.filter(
     (item) => !(item.text === 'Enrollment' && hideEnrollmentOn.includes(location.pathname))
   );
+  const desktopNavItems = filteredNavItems;
 
   return (
     <AppBar 
