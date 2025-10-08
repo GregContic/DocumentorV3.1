@@ -2,10 +2,10 @@
 
 ## Before You Start
 
-- [ ] Have a GitHub account
-- [ ] Have a Vercel account (free)
-- [ ] Have MongoDB Atlas account (free)
-- [ ] Your code is committed to Git
+- [/] Have a GitHub account
+- [/] Have a Vercel account (free)
+- [/] Have MongoDB Atlas account (free)
+- [/] Your code is committed to Git
 
 ## MongoDB Atlas Setup (5 minutes)
 
@@ -16,7 +16,8 @@
    - Password: (generate strong password, save it!)
 4. Network Access → Add IP Address → Allow from Anywhere (0.0.0.0/0)
 5. Database → Connect → Connect your application
-6. Copy connection string: `mongodb+srv://documentor_user:PASSWORD@cluster.mongodb.net/documentor`
+6. Copy connection string: `mongodb+srv://documentor_user:secretndeitoungpassword:)@cluster.mongodb.net/documentor`
+
 
 ## Push to GitHub (2 minutes)
 

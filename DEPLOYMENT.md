@@ -28,18 +28,6 @@ This deployment configuration supports:
 
 ## Step 2: Push to GitHub
 
-```bash
-# Initialize git if not already done
-git init
-git add .
-git commit -m "Prepare for Vercel deployment"
-
-# Create GitHub repository and push
-git remote add origin https://github.com/YOUR_USERNAME/YOUR_REPO.git
-git branch -M main
-git push -u origin main
-```
-
 ## Step 3: Import Project to Vercel
 
 1. Go to [vercel.com/dashboard](https://vercel.com/dashboard)
