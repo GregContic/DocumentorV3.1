@@ -46,7 +46,7 @@ Add these (minimum required):
 
 ```
 MONGODB_URI = mongodb+srv://documentor_user:YOUR_PASSWORD@cluster.mongodb.net/documentor
-JWT_SECRET = super-secret-change-this-random-string-123456
+JWT_SECRET = ndeitoungsecretlods
 NODE_ENV = production
 REACT_APP_API_URL = https://your-app-name.vercel.app
 FRONTEND_URL = https://your-app-name.vercel.app
