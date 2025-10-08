@@ -68,7 +68,7 @@ OPENAI_API_KEY = sk-your-key-here
 
 ### 4. Update CORS and Redeploy
 
-After you get your Vercel URL (e.g., `https://documentor-v3-abc123.vercel.app`):
+After you get your Vercel URL (e.g., `https://documentor-v3-v1.vercel.app`):
 
 1. Edit `backend/server.js`, find this line:
 ```javascript
