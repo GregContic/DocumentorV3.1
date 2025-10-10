@@ -26,7 +26,7 @@ const app = express();
 // CORS configuration: allow frontend origin and credentials
 const corsOptions = {
   origin: process.env.NODE_ENV === 'production' 
-    ? [process.env.FRONTEND_URL, 'https://documentor-v3-v1.vercel.app'] // Replace with your actual Vercel domain
+    ? [process.env.FRONTEND_URL, 'https://documentor-v3-1-8ofwc08jx-gregcontics-projects.vercel.app']
     : [
         'http://localhost:3000',
         'http://127.0.0.1:3000',

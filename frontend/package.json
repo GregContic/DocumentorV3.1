@@ -20,6 +20,7 @@
     "axios": "^1.6.7",
     "date-fns": "^2.30.0",
     "dayjs": "^1.11.13",
+    "documentor-v3": "file:..",
     "html-webpack-plugin": "^5.5.3",
     "jsqr": "^1.4.0",
     "multer": "^2.0.1",
@@ -44,8 +45,8 @@
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
-    "vercel-build": "react-scripts build",
+    "build": "cross-env CI=false react-scripts build",
+    "vercel-build": "cross-env CI=false react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -67,5 +68,8 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000"
+  "proxy": "http://localhost:5000",
+  "devDependencies": {
+    "cross-env": "^10.1.0"
+  }
 }
