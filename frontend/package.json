@@ -41,7 +41,8 @@
     "web-vitals": "^2.1.4",
     "webpack": "^5.89.0",
     "webpack-dev-server": "^5.2.2",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
+    "cross-env": "^7.0.3"
   },
   "scripts": {
     "start": "react-scripts start",
@@ -68,8 +69,5 @@
       "last 1 safari version"
     ]
   },
-  "proxy": "http://localhost:5000",
-  "devDependencies": {
-    "cross-env": "^10.1.0"
-  }
+  "proxy": "http://localhost:5000"
 }
